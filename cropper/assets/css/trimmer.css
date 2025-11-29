@@ -1,0 +1,80 @@
+body { font-family: Arial; padding: 20px; }
+    .box { margin-bottom: 20px; }
+    video { margin-top: 10px; }
+    .video-container { display: flex; flex-wrap: wrap; gap: 10px; }
+    .video-item { flex: 1 1 300px; } /* Adjust the width as needed */   
+    .video-item video { width: 100%; height: auto; }
+    .video-item p { text-align: center; margin-top: 5px; }
+    h1 { text-align: center; }
+    #searchInput { width: 100%; padding: 10px; margin-bottom: 20px; font-size: 16px; }
+    #searchButton { padding: 10px 20px; font-size: 16px; }
+    #noResults { text-align: center; font-size: 18px; color: red; display: none; }
+
+.labeltext {
+    font-weight: bold;
+    font-size: 25px;
+    margin-bottom:15px;
+    margin-top: 15px;
+}
+
+.trimmer-container {
+    width: 90%;
+    margin: 20px auto;
+    background: #ffffff;
+    padding: 20px;
+    border-radius: 8px;
+    color: white;
+}
+
+#videoPreview {
+    width: 100%;
+    margin-bottom: 20px;
+    border-radius: 6px;
+}
+
+.timeline-box {
+    position: relative;
+    width: 100%;
+    height: 90px;
+    background: #ffffff;
+    overflow: hidden;
+    border-radius: 6px;
+}
+
+.timeline {
+    display: flex;
+    height: 100%;
+}
+
+.thumbnail {
+    width: 100px;
+    height: 100%;
+    object-fit: cover;
+}
+
+.handle {
+    position: absolute;
+    top: 0;
+    width: 10px;
+    height: 100%;
+    background: #00cfff;
+    cursor: ew-resize;
+}
+
+.start {
+    left: 0;
+}
+
+.end {
+    right: 0;
+}
+
+.time-label {
+    position: absolute;
+    top: -25px;
+    background: #00cfff;
+    padding: 2px 5px;
+    font-size: 12px;
+    border-radius: 4px;
+}
+
