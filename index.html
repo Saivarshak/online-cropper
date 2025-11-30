@@ -28,36 +28,7 @@
     <link rel="apple-touch-icon-precomposed" href="assets/images/favicon.png">
 
 
-    <style>
-  :root{--bg:#0e2a55;--panel:#123c70;--accent:#00cfff;--muted:#88b0d9}
-  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; background:linear-gradient(180deg,#071733 0%,#0b3358 100%); color:#eaf6ff; padding:28px; margin:0}
-  .card{max-width:1100px;margin:0 auto;background:var(--bg);border-radius:10px;padding:18px;box-shadow:0 8px 30px rgba(2,6,23,.6)}
-  h2{margin:4px 0 12px;font-weight:600}
-  /* combined input */
-  .input-row{display:flex;gap:8px;align-items:center;margin-bottom:14px}
-  .url-input{flex:1;display:flex;align-items:center;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);padding:8px;border-radius:8px}
-  .url-input input[type="text"]{flex:1;border:0;background:transparent;color:inherit;padding:6px 8px;outline:none}
-  .file-btn{background:var(--accent);color:#02314a;border:none;padding:8px 10px;border-radius:6px;cursor:pointer}
-  .small{font-size:13px;color:var(--muted)}
-  video{width:100%;border-radius:8px;background:#000;display:block;margin-bottom:12px}
-  .timeline-wrap{position:relative;background:var(--panel);height:96px;border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,.04)}
-  .thumb-strip{display:flex;height:100%;align-items:center}
-  .thumb{flex:0 0 auto;width:120px;height:100%;object-fit:cover;opacity:.95}
-  /* handles */
-  .handle{position:absolute;top:0;height:100%;width:14px;background:linear-gradient(180deg, rgba(255,255,255,.95), rgba(255,255,255,.6));cursor:ew-resize;display:flex;align-items:flex-start;justify-content:center}
-  .handle .peg{width:6px;height:100%;background:var(--accent);border-radius:2px}
-  .start-handle{left:0;transform:translateX(-7px)}
-  .end-handle{right:0;transform:translateX(7px)}
-  .time-bubble{position:absolute;top:-28px;background:var(--accent);color:#002534;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:600}
-  .controls{display:flex;gap:8px;align-items:center;margin-top:12px}
-  button.action{background:var(--accent);border:0;padding:10px 14px;border-radius:8px;cursor:pointer;font-weight:600;color:#002534}
-  button.ghost{background:transparent;border:1px solid rgba(255,255,255,.06);padding:9px 12px;border-radius:8px;color:var(--muted);cursor:pointer}
-  .status{margin-left:auto;font-size:13px;color:var(--muted)}
-  .note{margin-top:10px;color:var(--muted);font-size:13px}
-  @media(max-width:720px){
-    .thumb{width:80px}
-  }
-</style>
+   
 
 </head>
 
@@ -239,58 +210,58 @@
                     </div>
                 </div>  
             </div>
-
+            
+            <!-- /banner -->
+            <!-- trimmer -->
   <div class="faqs-wrap">
                 <div class="themesflat-container">
                     <div class="row">
                         <div class="col-md-12">
+                        <div class="card">
                             
+                            <div class="input-row">
+                            <div class="url-input" title="Paste a direct MP4/WEBM link here or use the upload button.">
+                                <!--  <input id="comboInput" type="text" placeholder="Paste video URL (mp4/webm) or click upload" />
+                                <input id="fileInput" type="file" accept="video/*" style="display:none" />
+                                <button id="openFile" class="file-btn">Upload</button> -->
+                            </div> 
+                            <!--<button id="loadBtn" class="ghost">Load</button>-->
+                            </div> 
 
-  <div class="card">
-    <h2 style="text-align: center; color: #00cfff;">Video Trimmer</h2>
-    <div class="input-row">
-      <div class="url-input" title="Paste a direct MP4/WEBM link here or use the upload button.">
-        <input id="comboInput" type="text" placeholder="Paste video URL (mp4/webm) or click upload" />
-        <input id="fileInput" type="file" accept="video/*" style="display:none" />
-        <button id="openFile" class="file-btn">Upload</button>
-      </div>
-      <button id="loadBtn" class="ghost">Load</button>
-    </div>
+                            <video id="preview" controls playsinline></video>
 
-    <video id="preview" controls playsinline></video>
+                            <div class="timeline-wrap" id="timelineWrap">
+                            <div id="thumbStrip" class="thumb-strip"></div>
 
-    <div class="timeline-wrap" id="timelineWrap">
-      <div id="thumbStrip" class="thumb-strip"></div>
-
-      <div id="startHandle" class="handle start-handle" style="left:0">
-        <div class="peg"></div>
-        <div id="startBubble" class="time-bubble" style="left:18px;">00:00</div>
-      </div>
-
-      <div id="endHandle" class="handle end-handle" style="left:calc(100% - 14px)">
-        <div class="peg"></div>
-        <div id="endBubble" class="time-bubble" style="right:18px;">00:00</div>
-      </div>
-    </div>
-
-    <div class="controls">
-      <button id="trimBtn" class="action">Trim & Download</button>
-      <button id="resetBtn" class="ghost">Reset</button>
-      <div class="status" id="status">Ready</div>
-    </div>
-
-    <div class="note">
-      Tip: use the blue handles to choose start/end. Trimming uses browser captureStream + MediaRecorder. Remote URLs may block frame extraction due to CORS.
-    </div>
-  </div>
-
-
-
+                            <div id="startHandle" class="handle start-handle" style="left:0">
+                                <div class="peg"></div>
+                                <div id="startBubble" class="time-bubble" style="left:18px;">00:00</div>
                             </div>
+
+                            <div id="endHandle" class="handle end-handle" style="left:calc(100% - 14px)">
+                                <div class="peg"></div>
+                                <div id="endBubble" class="time-bubble" style="right:18px;">00:00</div>
+                            </div>
+                            </div>
+
+                            <div class="controls">
+                            <button id="trimBtn" class="action">Trim & Download</button>
+                            <button id="resetBtn" class="ghost">Reset</button>
+                            <div class="status" id="status">Ready</div>
+                            </div>
+
+                            <div class="note">
+                            Tip: use the blue handles to choose start/end. Trimming uses browser captureStream + MediaRecorder. Remote URLs may block frame extraction due to CORS.
+                            </div>
+                        </div>
+                        </div>
                         </div>
                     </div>
                 </div>
             </div>
+
+
+            <!-- /trimmer -->
 
             <!-- tool -->
             <div class="list-tool">
