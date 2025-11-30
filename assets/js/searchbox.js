@@ -1,388 +1,465 @@
-function loadVideo() {
-  const url = document.getElementById("videoUrl").value;
-  const video = document.getElementById("originalVideo");
+// Full main JS including black-transparent mask effect + bounded selection highlight
+document.addEventListener("DOMContentLoaded", () => {
+    const urlInput = document.getElementById("loadBtn"); 
+    const loadBtn = document.querySelector("button#loadBtn");
+    const uploadBtn = document.getElementById("openFile");
+    const preview = document.getElementById("preview");
 
-  if (!url) return alert("Enter video URL");
+    const fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = "video/*";
 
-  video.src = url;
-  document.getElementById("previewBox").style.display = "block";
+    const timelineWrap = document.getElementById("timelineWrap");
+    const thumbStrip = document.getElementById("thumbStrip");
+    const startHandle = document.getElementById("startHandle");
+    const endHandle = document.getElementById("endHandle");
+    const startBubble = document.getElementById("startBubble");
+    const endBubble = document.getElementById("endBubble");
+    const trimBtn = document.getElementById("trimBtn");
+    const resetBtn = document.getElementById("resetBtn");
+    const status = document.getElementById("status");
 
-  // Scroll to preview section
-  document.getElementById("previewBox").scrollIntoView({ behavior: "smooth" });
-}
+    let videoDuration = 0;
+    let startTime = 0;
+    let endTime = 0;
+    let thumbnailsCanvas = null;
+    let thumbnailsCtx = null;
 
-function trimVideo() {
-  const video = document.getElementById("originalVideo");
-  const start = parseInt(document.getElementById("startTime").value);
-  const end = parseInt(document.getElementById("endTime").value);
-
-  if (end <= start) {
-    alert("End time must be greater than start time");
-    return;
-  }
-
-  const stream = video.captureStream();
-  const recorder = new MediaRecorder(stream);
-  let chunks = [];
-
-  recorder.ondataavailable = e => chunks.push(e.data);
-  recorder.onstop = () => {
-    const blob = new Blob(chunks, { type: "video/mp4" });
-    const url = URL.createObjectURL(blob);
-
-    document.getElementById("trimmedVideo").src = url;
-    document.getElementById("downloadLink").href = url;
-
-    document.getElementById("trimBox").style.display = "block";
-    document.getElementById("trimBox").scrollIntoView({ behavior: "smooth" });
-  };
-
-  video.currentTime = start;
-
-  video.onseeked = () => {
-    recorder.start();
-    video.play();
-
-    setTimeout(() => {
-      recorder.stop();
-      video.pause();
-    }, (end - start) * 1000);
-  };
-}
-
-function trimSelectedVideo() {
-  const file = document.getElementById("videoupload").files[0];
-  if (!file) return alert("Upload a video");
-
-  const url = URL.createObjectURL(file);
-  const video = document.getElementById("originalVideo");
-
-  video.src = url;
-
-  document.getElementById("previewBox").style.display = "block";
-  document.getElementById("previewBox").scrollIntoView({ behavior: "smooth" });
-}
-
-(function(){
-  // Elements
-  const comboInput = document.getElementById('comboInput');
-  const fileInput = document.getElementById('fileInput');
-  const openFile = document.getElementById('openFile');
-  const loadBtn = document.getElementById('loadBtn');
-  const preview = document.getElementById('preview');
-  const thumbStrip = document.getElementById('thumbStrip');
-  const startHandle = document.getElementById('startHandle');
-  const endHandle = document.getElementById('endHandle');
-  const startBubble = document.getElementById('startBubble');
-  const endBubble = document.getElementById('endBubble');
-  const trimBtn = document.getElementById('trimBtn');
-  const resetBtn = document.getElementById('resetBtn');
-  const status = document.getElementById('status');
-  const timelineWrap = document.getElementById('timelineWrap');
-
-  let videoDuration = 0;
-  let dragging = null; // "start" | "end" | null
-  let startPercent = 0;
-  let endPercent = 1;
-  let generatedThumbnails = false;
-  let currentFileUrl = null;
-
-  // Helpers
-  function formatTime(t){
-    if (!isFinite(t)) return '00:00';
-    t = Math.max(0, Math.floor(t));
-    const m = Math.floor(t/60);
-    const s = t % 60;
-    return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
-  }
-
-  function setStatus(text){
-    status.textContent = text;
-  }
-
-  // Combined input handlers
-  openFile.addEventListener('click', ()=> fileInput.click());
-  fileInput.addEventListener('change', (e)=>{
-    const f = e.target.files && e.target.files[0];
-    if (!f) return;
-    comboInput.value = f.name;
-    loadVideoFromFile(f);
-  });
-
-  loadBtn.addEventListener('click', ()=>{
-    const val = comboInput.value.trim();
-    if (!val){
-      setStatus('Paste a URL or upload a file first.');
-      return;
+    function setStatus(msg) {
+        if (status) status.textContent = msg || "";
     }
-    // If input looks like a URL -> try to load
-    if (/^https?:\/\//i.test(val)){
-      loadVideoFromUrl(val);
-    } else {
-      setStatus('If you pasted text that is not a URL, upload a local file instead.');
+
+    function scrollToPreview() {
+        preview.scrollIntoView({ behavior: "smooth", block: "center" });
     }
-  });
 
-  // Loaders
-  function revokeOld(){
-    if (currentFileUrl){ URL.revokeObjectURL(currentFileUrl); currentFileUrl = null; }
-  }
-
-  function loadVideoFromFile(file){
-    revokeOld();
-    const url = URL.createObjectURL(file);
-    currentFileUrl = url;
-    preparePreview(url);
-  }
-
-  function loadVideoFromUrl(url){
-    revokeOld();
-    // set src to url directly -- CORS may block thumbnail extraction later
-    preparePreview(url);
-  }
-
-  function preparePreview(src){
-    generatedThumbnails = false;
-    thumbStrip.innerHTML = '';
-    preview.src = '';
-    preview.pause();
-    preview.removeAttribute('src');
-    preview.src = src;
-    preview.load();
-    setStatus('Loading video metadata...');
-    preview.onloadedmetadata = () => {
-      videoDuration = preview.duration || 0;
-      setStatus('Video loaded: ' + formatTime(videoDuration));
-      // set end bubble to duration
-      endBubble.textContent = formatTime(videoDuration);
-      startBubble.textContent = '00:00';
-      startPercent = 0; endPercent = 1;
-      positionHandles();
-      // attempt thumbnails
-      generateThumbnails().catch(err=>{
-        console.warn('thumb error',err);
-        setStatus('Video loaded but thumbnails blocked by CORS or not supported.');
-      });
-    };
-    preview.onerror = (e) => {
-      setStatus('Failed to load video. Check URL or file.');
-    };
-  }
-
-  // Thumbnail generation using offscreen canvas and setting currentTime for frames
-  async function generateThumbnails(){
-    // Quick guard
-    if (!preview || !preview.duration || preview.readyState < 1) {
-      // wait a bit
-      await new Promise(r => setTimeout(r,300));
+    function formatTime(sec) {
+        if (!isFinite(sec) || sec < 0) sec = 0;
+        const m = Math.floor(sec / 60);
+        const s = Math.floor(sec % 60);
+        return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
     }
-    const steps = 12; // number of thumbs
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    const w = 160, h = 90;
-    canvas.width = w; canvas.height = h;
 
-    // try capturing frames: some remote sources will block
-    for (let i = 0; i < steps; i++){
-      const t = Math.min(preview.duration, (i/ (steps-1)) * preview.duration);
-      try{
-        await seekVideo(thisOr(preview), t);
-        ctx.drawImage(preview, 0, 0, w, h);
-        const img = document.createElement('img');
-        img.className = 'thumb';
-        img.src = canvas.toDataURL('image/jpeg',0.6);
-        thumbStrip.appendChild(img);
-      } catch(err){
-        // fallback: show poster-style blank
-        const ph = document.createElement('div');
-        ph.className = 'thumb';
-        ph.style.background = 'linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01))';
-        thumbStrip.appendChild(ph);
-      }
+    function updateBubbles() {
+        startBubble.textContent = formatTime(startTime);
+        endBubble.textContent = formatTime(endTime);
     }
-    generatedThumbnails = true;
-  }
 
-  // helper to ensure video is seeked to requested time, resolve on seeked event
-  function seekVideo(v, time){
-    return new Promise((resolve, reject)=>{
-      function onseek(){
-        v.removeEventListener('seeked', onseek);
-        resolve();
-      }
-      v.addEventListener('seeked', onseek);
-      // set a timeout to avoid hanging if seek never happens
-      const to = setTimeout(()=> {
-        v.removeEventListener('seeked', onseek);
-        reject(new Error('seek timeout'));
-      }, 3000);
-      // try to set time
-      try { v.currentTime = Math.min(Math.max(0, time), v.duration || time); }
-      catch(e){ clearTimeout(to); v.removeEventListener('seeked', onseek); reject(e); }
+    // -----------------------------
+    // MASKS + BOUNDED SELECTION HIGHLIGHT
+    // -----------------------------
+    const leftMask = document.createElement("div");
+    const rightMask = document.createElement("div");
+    const selectionOverlay = document.createElement("div"); // bounded highlight
+
+    [leftMask, rightMask, selectionOverlay].forEach(el => {
+        el.style.position = "absolute";
+        el.style.top = "0";
+        el.style.bottom = "0";
+        el.style.pointerEvents = "none";
     });
-  }
 
-  // Drag logic for handles (mouse + touch)
-  function positionHandles(){
-    const wrapRect = timelineWrap.getBoundingClientRect();
-    const totalW = wrapRect.width;
-    startHandle.style.left = (startPercent * totalW - startHandle.offsetWidth/2) + 'px';
-    endHandle.style.left = (endPercent * totalW - endHandle.offsetWidth/2) + 'px';
-    startBubble.textContent = formatTime(startPercent * videoDuration);
-    endBubble.textContent = formatTime(endPercent * videoDuration);
-  }
+    leftMask.style.background = "rgba(0,0,0,0.65)";
+    leftMask.style.zIndex = "20";
 
-  function clientXToPercent(clientX){
-    const rect = timelineWrap.getBoundingClientRect();
-    let x = clientX - rect.left;
-    x = Math.max(0, Math.min(x, rect.width));
-    return x / rect.width;
-  }
+    rightMask.style.background = "rgba(0,0,0,0.65)";
+    rightMask.style.zIndex = "20";
 
-  function startDrag(which, e){
-    dragging = which;
-    document.body.style.userSelect = 'none';
-    if (e.type === 'touchstart') e = e.touches[0];
-    // one move handler
-    function onMove(ev){
-      if (!dragging) return;
-      if (ev.type === 'touchmove') ev = ev.touches[0];
-      const p = clientXToPercent(ev.clientX);
-      if (dragging === 'start'){
-        startPercent = Math.min(p, endPercent - 0.01);
-      } else {
-        endPercent = Math.max(p, startPercent + 0.01);
-      }
-      positionHandles();
+    // selection overlay: transparent fill, visible blue outline + glow
+    selectionOverlay.style.background = "transparent";
+    selectionOverlay.style.border = "4px solid rgba(0,123,255,0.95)";
+    selectionOverlay.style.boxShadow = "0 0 8px rgba(0,123,255,0.25)";
+    selectionOverlay.style.borderRadius = "12px";
+    selectionOverlay.style.zIndex = "25";
+
+    leftMask.id = "leftMask";
+    rightMask.id = "rightMask";
+    selectionOverlay.id = "selectionOverlay";
+
+    // ensure timelineWrap is positioned and contains overlays
+    // keep existing layout intact
+    if (getComputedStyle(timelineWrap).position === "static") {
+        timelineWrap.style.position = "relative";
     }
-    function onUp(){
-      dragging = null;
-      document.body.style.userSelect = '';
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-      window.removeEventListener('touchmove', onMove);
-      window.removeEventListener('touchend', onUp);
-    }
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-    window.addEventListener('touchmove', onMove,{passive:false});
-    window.addEventListener('touchend', onUp);
-  }
+    timelineWrap.appendChild(leftMask);
+    timelineWrap.appendChild(rightMask);
+    timelineWrap.appendChild(selectionOverlay);
 
-  startHandle.addEventListener('mousedown', e => startDrag('start', e));
-  endHandle.addEventListener('mousedown', e => startDrag('end', e));
-  startHandle.addEventListener('touchstart', e => startDrag('start', e));
-  endHandle.addEventListener('touchstart', e => startDrag('end', e));
+    // update masks and selection overlay positions/sizes
+    function updateMasks() {
+        const rect = timelineWrap.getBoundingClientRect();
+        const timelineW = rect.width || 0;
 
-  // Clicking on timeline moves nearest handle
-  timelineWrap.addEventListener('click', (ev)=>{
-    const p = clientXToPercent(ev.clientX);
-    // choose which handle is closer
-    if (Math.abs(p - startPercent) < Math.abs(p - endPercent)){
-      startPercent = Math.min(p, endPercent - 0.01);
-    } else {
-      endPercent = Math.max(p, startPercent + 0.01);
-    }
-    positionHandles();
-  });
+        const startPx = Math.max(0, Math.min(timelineW, parseFloat(startHandle.style.left) || 0));
+        const endPxCandidate = parseFloat(endHandle.style.left);
+        const endPx = isFinite(endPxCandidate) ? Math.max(0, Math.min(timelineW, endPxCandidate)) : timelineW;
 
-  // Trim logic using captureStream + MediaRecorder
-  trimBtn.addEventListener('click', async ()=>{
-    if (!preview.src) { setStatus('Load a video first.'); return; }
-    if (!videoDuration || !isFinite(videoDuration)) { setStatus('Video not ready.'); return; }
-    const s = startPercent * videoDuration;
-    const e = endPercent * videoDuration;
-    if (e - s < 0.2){ setStatus('Segment too short (min 0.2s).'); return; }
+        // left mask: from left edge to start handle
+        leftMask.style.left = "0px";
+        leftMask.style.width = `${startPx}px`;
 
-    setStatus('Preparing to trim...');
+        // right mask: from end handle to right edge
+        rightMask.style.left = `${endPx}px`;
+        rightMask.style.width = `${Math.max(0, timelineW - endPx)}px`;
 
-    // try to get a stream of the video playback
-    let stream;
-    try {
-      stream = preview.captureStream ? preview.captureStream() : preview.mozCaptureStream ? preview.mozCaptureStream() : null;
-    } catch(err){}
-    if (!stream){
-      setStatus('Browser does not support captureStream() for trimming.');
-      return;
-    }
+        // selection overlay: between start and end handles
+        const selLeft = startPx;
+        const selWidth = Math.max(0, endPx - startPx);
+        selectionOverlay.style.left = `${selLeft}px`;
+        selectionOverlay.style.width = `${selWidth}px`;
 
-    // Prepare recorder
-    let options = {mimeType: ''};
-    // choose a supported mimeType
-    const candidates = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
-    for (const c of candidates){
-      if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(c)){
-        options.mimeType = c; break;
-      }
-    }
-    setStatus('Recording segment ('+formatTime(s)+' → '+formatTime(e)+')...');
-    const recorder = new MediaRecorder(stream, options.mimeType ? {mimeType: options.mimeType} : undefined);
-    const chunks = [];
-    recorder.ondataavailable = (ev) => { if (ev.data && ev.data.size) chunks.push(ev.data); };
-    recorder.onstop = () => {
-      const blob = new Blob(chunks, {type: recorder.mimeType || 'video/webm'});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'trimmed_video.' + (recorder.mimeType && recorder.mimeType.includes('mp4') ? 'mp4' : 'webm');
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setStatus('Trim complete. Download started.');
-      // cleanup
-      setTimeout(()=> URL.revokeObjectURL(url), 60000);
-    };
-
-    // Seek video to start, play, and record for duration
-    try {
-      await seekVideo(preview, s);
-      // small delay to ensure frames ready
-      await new Promise(r=>setTimeout(r,150));
-      recorder.start();
-      // play the video (muted to avoid audio autoplay block)
-      const mutedBefore = preview.muted;
-      preview.muted = true;
-      await preview.play();
-      // schedule stop
-      const stopAt = e;
-      const onTimeUpdate = () => {
-        if (preview.currentTime >= stopAt - 0.03){
-          preview.pause();
-          preview.muted = mutedBefore;
-          recorder.stop();
-          preview.removeEventListener('timeupdate', onTimeUpdate);
+        // small visual tweak: if selection is too small, hide outline to avoid overlap
+        if (selWidth < 8) {
+            selectionOverlay.style.opacity = "0";
+        } else {
+            selectionOverlay.style.opacity = "1";
         }
-      };
-      preview.addEventListener('timeupdate', onTimeUpdate);
-      // fallback timeout
-      setTimeout(()=> {
-        if (recorder.state === 'recording') { preview.pause(); recorder.stop(); }
-      }, Math.max(3000, (e - s + 1) * 1000));
-    } catch(err){
-      console.error(err);
-      setStatus('Trimming failed. Possibly blocked by CORS or browser limitations.');
     }
-  });
 
-  resetBtn.addEventListener('click', ()=>{
-    comboInput.value = '';
-    fileInput.value = '';
-    preview.pause();
-    preview.removeAttribute('src');
-    preview.load();
-    thumbStrip.innerHTML = '';
-    startPercent = 0; endPercent = 1;
-    setStatus('Reset');
-    revokeOld();
-    positionHandles();
-  });
+    // ----------------------------------
 
-  // initial position update on resize
-  window.addEventListener('resize', positionHandles);
+    function loadVideoFromURL() {
+        const val = (urlInput && urlInput.value) ? urlInput.value.trim() : "";
+        if (!val) return;
+        setStatus("Loading video...");
+        preview.crossOrigin = "anonymous";
+        preview.src = val;
+        preview.load();
 
-  // small helper used by generateThumbnails (to keep call stable)
-  function thisOr(v){ return v; }
+        preview.onloadedmetadata = () => {
+            videoDuration = preview.duration || 0;
+            startTime = 0;
+            endTime = videoDuration;
+            updateBubbles();
+            scrollToPreview();
+            // set handles to bounds
+            requestAnimationFrame(() => {
+                startHandle.style.left = "0px";
+                const rect = timelineWrap.getBoundingClientRect();
+                endHandle.style.left = Math.max(0, rect.width - 14) + "px";
+                updateMasks();
+            });
+            generateThumbnails(preview.src).catch(() => setStatus("Ready"));
+            setStatus("Ready");
+        };
+    }
 
-  // position handles when video element ready size
-  preview.addEventListener('loadeddata', positionHandles);
-})();
+    function loadVideoFromFile(file) {
+        if (!file) return;
+        setStatus("Loading video...");
+        const url = URL.createObjectURL(file);
+        preview.src = url;
+        if (urlInput) urlInput.value = url;
+        preview.removeAttribute("crossorigin");
+        preview.load();
+
+        preview.onloadedmetadata = () => {
+            videoDuration = preview.duration || 0;
+            startTime = 0;
+            endTime = videoDuration;
+            updateBubbles();
+            scrollToPreview();
+            requestAnimationFrame(() => {
+                startHandle.style.left = "0px";
+                const rect = timelineWrap.getBoundingClientRect();
+                endHandle.style.left = Math.max(0, rect.width - 14) + "px";
+                updateMasks();
+            });
+            generateThumbnails(preview.src).catch(() => setStatus("Ready"));
+            setStatus("Ready");
+        };
+    }
+
+    uploadBtn.addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", e => {
+        const file = e.target.files[0];
+        if (file) loadVideoFromFile(file);
+    });
+
+    if (loadBtn) loadBtn.addEventListener("click", loadVideoFromURL);
+
+    function makeDraggable(handle, isStart) {
+        handle.addEventListener("mousedown", (e) => {
+            e.preventDefault();
+            const handleRect = handle.getBoundingClientRect();
+            const grabOffset = e.clientX - handleRect.left;
+
+            function onMove(ev) {
+                const rect = timelineWrap.getBoundingClientRect();
+                let pos = ev.clientX - rect.left - grabOffset + (handleRect.width / 2);
+                pos = Math.max(0, Math.min(pos, rect.width));
+                const percent = pos / rect.width;
+
+                if (isStart) {
+                    startTime = videoDuration * percent;
+                    startHandle.style.left = pos + "px";
+                } else {
+                    endTime = videoDuration * percent;
+                    endHandle.style.left = pos + "px";
+                }
+
+                if (startTime > endTime) {
+                    if (isStart) {
+                        startTime = endTime;
+                        startHandle.style.left = endHandle.style.left;
+                    } else {
+                        endTime = startTime;
+                        endHandle.style.left = startHandle.style.left;
+                    }
+                }
+
+                updateBubbles();
+                updateMasks();
+            }
+
+            function onUp() {
+                document.removeEventListener("mousemove", onMove);
+                document.removeEventListener("mouseup", onUp);
+            }
+
+            document.addEventListener("mousemove", onMove);
+            document.addEventListener("mouseup", onUp);
+        });
+
+        handle.addEventListener("touchstart", (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const handleRect = handle.getBoundingClientRect();
+            const grabOffset = touch.clientX - handleRect.left;
+
+            function onTouchMove(ev) {
+                const t = ev.touches[0];
+                const rect = timelineWrap.getBoundingClientRect();
+                let pos = t.clientX - rect.left - grabOffset + (handleRect.width / 2);
+                pos = Math.max(0, Math.min(pos, rect.width));
+                const percent = pos / rect.width;
+
+                if (isStart) {
+                    startTime = videoDuration * percent;
+                    startHandle.style.left = pos + "px";
+                } else {
+                    endTime = videoDuration * percent;
+                    endHandle.style.left = pos + "px";
+                }
+
+                if (startTime > endTime) {
+                    if (isStart) {
+                        startTime = endTime;
+                        startHandle.style.left = endHandle.style.left;
+                    } else {
+                        endTime = startTime;
+                        endHandle.style.left = startHandle.style.left;
+                    }
+                }
+
+                updateBubbles();
+                updateMasks();
+            }
+
+            function onTouchEnd() {
+                document.removeEventListener("touchmove", onTouchMove);
+                document.removeEventListener("touchend", onTouchEnd);
+            }
+
+            document.addEventListener("touchmove", onTouchMove, { passive: false });
+            document.addEventListener("touchend", onTouchEnd);
+        });
+    }
+
+    makeDraggable(startHandle, true);
+    makeDraggable(endHandle, false);
+
+    async function generateThumbnails(videoSrc) {
+        setStatus("Generating thumbnails...");
+        thumbStrip.innerHTML = "";
+
+        const width = Math.max(200, timelineWrap.clientWidth || 600);
+        const thumbHeight = Math.max(48, Math.floor((timelineWrap.clientHeight || 80) * 0.95));
+        thumbnailsCanvas = document.createElement("canvas");
+        thumbnailsCanvas.width = width;
+        thumbnailsCanvas.height = thumbHeight;
+        thumbnailsCanvas.style.width = "100%";
+        thumbnailsCanvas.style.height = thumbHeight + "px";
+        thumbnailsCanvas.style.display = "block";
+        thumbnailsCanvas.style.objectFit = "cover";
+        thumbnailsCtx = thumbnailsCanvas.getContext("2d");
+        thumbStrip.appendChild(thumbnailsCanvas);
+
+        const desiredThumbW = 80;
+        const numThumbs = Math.max(4, Math.floor(width / desiredThumbW));
+        const actualThumbW = Math.floor(width / numThumbs);
+
+        const tempVideo = document.createElement("video");
+        tempVideo.muted = true;
+        tempVideo.playsInline = true;
+        tempVideo.crossOrigin = "anonymous";
+        tempVideo.src = videoSrc;
+
+        await new Promise((res, rej) => {
+            tempVideo.addEventListener("loadedmetadata", res, { once: true });
+            tempVideo.addEventListener("error", rej, { once: true });
+        });
+
+        const duration = tempVideo.duration || videoDuration;
+        const times = [];
+
+        for (let i = 0; i < numThumbs; i++) {
+            times.push((i / (numThumbs - 1)) * duration);
+        }
+
+        function seekTo(time) {
+            return new Promise((resolve) => {
+                tempVideo.currentTime = Math.min(time, tempVideo.duration - 0.001);
+                tempVideo.addEventListener("seeked", resolve, { once: true });
+                setTimeout(resolve, 2000);
+            });
+        }
+
+        for (let i = 0; i < times.length; i++) {
+            await seekTo(times[i]);
+            const dx = i * actualThumbW;
+            const dy = 0;
+            const dw = actualThumbW;
+            const dh = thumbHeight;
+
+            thumbnailsCtx.fillStyle = "#123a66";
+            thumbnailsCtx.fillRect(dx, dy, dw, dh);
+
+            try {
+                const videoRatio = tempVideo.videoWidth / tempVideo.videoHeight;
+                const canvasRatio = dw / dh;
+                let drawW, drawH, drawX, drawY;
+
+                if (videoRatio > canvasRatio) {
+                    drawH = dh;
+                    drawW = dh * videoRatio;
+                    drawX = dx - (drawW - dw) / 2;
+                    drawY = 0;
+                } else {
+                    drawW = dw;
+                    drawH = dw / videoRatio;
+                    drawX = dx;
+                    drawY = -(drawH - dh) / 2;
+                }
+
+                thumbnailsCtx.drawImage(tempVideo, drawX, drawY, drawW, drawH);
+            } catch (err) {}
+        }
+
+        requestAnimationFrame(() => {
+            const rect = timelineWrap.getBoundingClientRect();
+            endHandle.style.left = Math.max(0, rect.width - 14) + "px";
+            updateMasks();
+        });
+
+        setStatus("Ready");
+    }
+
+    trimBtn.addEventListener("click", async () => {
+        if (!preview.src) {
+            alert("Load a video first");
+            return;
+        }
+
+        setStatus("Trimming…");
+
+        const rect = timelineWrap.getBoundingClientRect();
+        const timelineWidth = rect.width || 1;
+        const startLeft = parseFloat(startHandle.style.left) || 0;
+        const endLeft = parseFloat(endHandle.style.left) || timelineWidth;
+        const computedStart = (startLeft / timelineWidth) * videoDuration;
+        const computedEnd = (endLeft / timelineWidth) * videoDuration;
+
+        startTime = Math.max(0, Math.min(videoDuration, computedStart));
+        endTime = Math.max(0, Math.min(videoDuration, computedEnd));
+
+        if (startTime >= endTime) {
+            alert("Start must be before end");
+            setStatus("Ready");
+            return;
+        }
+
+        const mime = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
+            ? "video/webm;codecs=vp9"
+            : MediaRecorder.isTypeSupported("video/webm;codecs=vp8")
+            ? "video/webm;codecs=vp8"
+            : "video/webm";
+
+        preview.currentTime = startTime;
+        try { await preview.play(); } catch {}
+
+        const stream = preview.captureStream ? preview.captureStream() : null;
+        if (!stream) {
+            alert("Browser does not support captureStream");
+            setStatus("Ready");
+            return;
+        }
+
+        const recorder = new MediaRecorder(stream, { mimeType: mime });
+        const chunks = [];
+        recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+        recorder.onstop = () => {
+            const url = URL.createObjectURL(new Blob(chunks, { type: mime }));
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "trimmed_video.webm";
+            a.click();
+            setStatus("Done");
+            preview.pause();
+        };
+
+        recorder.start();
+        setTimeout(() => recorder.stop(), Math.max(200, (endTime - startTime) * 1000));
+    });
+
+    resetBtn.addEventListener("click", () => {
+        startTime = 0;
+        endTime = videoDuration;
+        startHandle.style.left = "0px";
+
+        requestAnimationFrame(() => {
+            const rect = timelineWrap.getBoundingClientRect();
+            endHandle.style.left = Math.max(0, rect.width - 14) + "px";
+            updateMasks();
+        });
+
+        updateBubbles();
+    });
+
+    window.addEventListener("resize", () => {
+        requestAnimationFrame(() => {
+            const rect = timelineWrap.getBoundingClientRect();
+            const percent = videoDuration ? endTime / videoDuration : 1;
+            endHandle.style.left = Math.max(0, rect.width * percent - 14) + "px";
+            updateMasks();
+
+            if (preview.src) {
+                if (window._thumbResizeTimer) clearTimeout(window._thumbResizeTimer);
+                window._thumbResizeTimer = setTimeout(() => {
+                    generateThumbnails(preview.src);
+                }, 300);
+            }
+        });
+    });
+
+    if (preview && preview.src) {
+        preview.addEventListener("loadedmetadata", () => {
+            videoDuration = preview.duration;
+            startTime = 0;
+            endTime = videoDuration;
+            updateBubbles();
+            updateMasks();
+            generateThumbnails(preview.src);
+        }, { once: true });
+    }
+
+    timelineWrap.addEventListener("click", (e) => {
+        const rect = timelineWrap.getBoundingClientRect();
+        const pos = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+        const t = (pos / rect.width) * videoDuration;
+        if (isFinite(t)) preview.currentTime = t;
+    });
+
+    // initial mask update in case timeline has fixed size before any video loaded
+    requestAnimationFrame(updateMasks);
+});
