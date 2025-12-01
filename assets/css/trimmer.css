@@ -1,13 +1,27 @@
-body { 
-    font-family: Arial; 
-    padding: 20px; 
-    margin: 0;
-    background: #feffff; /* dark background to remove white area */
+/* GLOBAL FIX: Remove horizontal overflow (double scrollbar issue) */
+html, body {
+    overflow-x: hidden;
 }
 
+/* MAIN BODY */
+body { 
+    font-family: Arial, system-ui, -apple-system, Segoe UI, Roboto, Helvetica;
+    padding: 20px; 
+    margin: 0;
+    background: #f7fbfbff;
+    color: #eaf6ff;
+}
+
+/* Video List */
 .box { margin-bottom: 20px; }
 
-video { margin-top: 10px; }
+video { 
+    margin-top: 10px;
+    width: 100%;
+    border-radius: 8px;
+    background: #000;
+    display: block;
+}
 
 .video-container { 
     display: flex; 
@@ -19,18 +33,14 @@ video { margin-top: 10px; }
     flex: 1 1 300px; 
 }
 
-.video-item video { 
-    width: 100%; 
-    height: auto; 
-}
-
 .video-item p { 
     text-align: center; 
     margin-top: 5px; 
 }
 
-h1 { text-align: center; }
+h1, h2 { text-align: center; font-weight: 600; }
 
+/* Search */
 #searchInput { 
     width: 100%; 
     padding: 10px; 
@@ -57,30 +67,26 @@ h1 { text-align: center; }
     margin-top: 15px;
 }
 
-/* FIXED: Removed white background */
+/* TRIMMER */
 .trimmer-container {
     width: 90%;
     margin: 20px auto;
-    background: #fbfbfc; /* dark panel */
+    background: #fbfbfc;
     padding: 20px;
     border-radius: 8px;
     color: white;
 }
 
-/* FIXED: Removed white background */
 .timeline-box {
     position: relative;
     width: 100%;
     height: 90px;
-    background: #ffffff; /* dark panel */
+    background: #ffffff;
     overflow: hidden;
     border-radius: 6px;
 }
 
-.timeline {
-    display: flex;
-    height: 100%;
-}
+.timeline { display: flex; height: 100%; }
 
 .thumbnail {
     width: 100px;
@@ -109,22 +115,15 @@ h1 { text-align: center; }
     border-radius: 4px;
 }
 
+/* Theme Colors */
 :root{
-    --bg:#beeded;
-    --panel:#beeded;
+    --bg:#ffffff;
+    --panel:#ffffff;
     --accent:#00cfff;
     --muted:#88b0d9;
 }
 
-/* FIX: Removed white gradient background */
-body{
-    font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
-    background:#beeded;
-    color:#eaf6ff;
-    padding:28px;
-    margin:0;
-}
-
+/* Card */
 .card{
     max-width:1100px;
     margin:0 auto;
@@ -134,10 +133,13 @@ body{
     box-shadow:0 8px 30px rgba(2,6,23,.6);
 }
 
-h2{ margin:4px 0 12px; font-weight:600; }
-
-/* combined input */
-.input-row{ display:flex; gap:8px; align-items:center; margin-bottom:14px; }
+/* Combined Input */
+.input-row{ 
+    display:flex; 
+    gap:8px; 
+    align-items:center; 
+    margin-bottom:14px; 
+}
 
 .url-input{
     flex:1;
@@ -169,15 +171,7 @@ h2{ margin:4px 0 12px; font-weight:600; }
 
 .small{ font-size:13px; color:var(--muted); }
 
-video{
-    width:100%;
-    border-radius:8px;
-    background:#000;
-    display:block;
-    margin-bottom:12px;
-}
-
-/* FIXED: No more white box */
+/* Timeline strip */
 .timeline-wrap{
     position:relative;
     background:var(--panel);
@@ -201,7 +195,7 @@ video{
     opacity:.95;
 }
 
-/* handles */
+/* Handles */
 .handle{
     position:absolute;
     top:0;
@@ -235,6 +229,7 @@ video{
     font-weight:600;
 }
 
+/* Controls */
 .controls{
     display:flex;
     gap:8px;
@@ -265,6 +260,7 @@ button.ghost{
 
 .note{ margin-top:10px; color:var(--muted); font-size:13px; }
 
+/* Responsive */
 @media(max-width:720px){
     .thumb{ width:80px; }
 }

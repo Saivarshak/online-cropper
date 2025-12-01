@@ -1,4 +1,4 @@
-// Full main JS including black-transparent mask effect + bounded selection highlight
+// Full main JS including black-transparent mask effect + bounded selection highlight + server-side trimming
 document.addEventListener("DOMContentLoaded", () => {
     const urlInput = document.getElementById("loadBtn"); 
     const loadBtn = document.querySelector("button#loadBtn");
@@ -50,7 +50,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // -----------------------------
     const leftMask = document.createElement("div");
     const rightMask = document.createElement("div");
-    const selectionOverlay = document.createElement("div"); // bounded highlight
+    const selectionOverlay = document.createElement("div");
 
     [leftMask, rightMask, selectionOverlay].forEach(el => {
         el.style.position = "absolute";
@@ -65,7 +65,6 @@ document.addEventListener("DOMContentLoaded", () => {
     rightMask.style.background = "rgba(0,0,0,0.65)";
     rightMask.style.zIndex = "20";
 
-    // selection overlay: transparent fill, visible blue outline + glow
     selectionOverlay.style.background = "transparent";
     selectionOverlay.style.border = "4px solid rgba(0,123,255,0.95)";
     selectionOverlay.style.boxShadow = "0 0 8px rgba(0,123,255,0.25)";
@@ -76,8 +75,6 @@ document.addEventListener("DOMContentLoaded", () => {
     rightMask.id = "rightMask";
     selectionOverlay.id = "selectionOverlay";
 
-    // ensure timelineWrap is positioned and contains overlays
-    // keep existing layout intact
     if (getComputedStyle(timelineWrap).position === "static") {
         timelineWrap.style.position = "relative";
     }
@@ -85,7 +82,6 @@ document.addEventListener("DOMContentLoaded", () => {
     timelineWrap.appendChild(rightMask);
     timelineWrap.appendChild(selectionOverlay);
 
-    // update masks and selection overlay positions/sizes
     function updateMasks() {
         const rect = timelineWrap.getBoundingClientRect();
         const timelineW = rect.width || 0;
@@ -94,26 +90,18 @@ document.addEventListener("DOMContentLoaded", () => {
         const endPxCandidate = parseFloat(endHandle.style.left);
         const endPx = isFinite(endPxCandidate) ? Math.max(0, Math.min(timelineW, endPxCandidate)) : timelineW;
 
-        // left mask: from left edge to start handle
         leftMask.style.left = "0px";
         leftMask.style.width = `${startPx}px`;
 
-        // right mask: from end handle to right edge
         rightMask.style.left = `${endPx}px`;
         rightMask.style.width = `${Math.max(0, timelineW - endPx)}px`;
 
-        // selection overlay: between start and end handles
         const selLeft = startPx;
         const selWidth = Math.max(0, endPx - startPx);
         selectionOverlay.style.left = `${selLeft}px`;
         selectionOverlay.style.width = `${selWidth}px`;
 
-        // small visual tweak: if selection is too small, hide outline to avoid overlap
-        if (selWidth < 8) {
-            selectionOverlay.style.opacity = "0";
-        } else {
-            selectionOverlay.style.opacity = "1";
-        }
+        selectionOverlay.style.opacity = selWidth < 8 ? "0" : "1";
     }
 
     // ----------------------------------
@@ -132,7 +120,6 @@ document.addEventListener("DOMContentLoaded", () => {
             endTime = videoDuration;
             updateBubbles();
             scrollToPreview();
-            // set handles to bounds
             requestAnimationFrame(() => {
                 startHandle.style.left = "0px";
                 const rect = timelineWrap.getBoundingClientRect();
@@ -355,6 +342,9 @@ document.addEventListener("DOMContentLoaded", () => {
         setStatus("Ready");
     }
 
+    // --------------------------
+    // SERVER-SIDE TRIM INTEGRATION
+    // --------------------------
     trimBtn.addEventListener("click", async () => {
         if (!preview.src) {
             alert("Load a video first");
@@ -379,37 +369,40 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        const mime = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
-            ? "video/webm;codecs=vp9"
-            : MediaRecorder.isTypeSupported("video/webm;codecs=vp8")
-            ? "video/webm;codecs=vp8"
-            : "video/webm";
-
-        preview.currentTime = startTime;
-        try { await preview.play(); } catch {}
-
-        const stream = preview.captureStream ? preview.captureStream() : null;
-        if (!stream) {
-            alert("Browser does not support captureStream");
+        let filename = "";
+        if (preview.src.includes("/backend/uploads/")) {
+            filename = preview.src.split("/backend/uploads/")[1];
+        } else {
+            alert("Uploaded video not recognized for server trim.");
             setStatus("Ready");
             return;
         }
 
-        const recorder = new MediaRecorder(stream, { mimeType: mime });
-        const chunks = [];
-        recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
-        recorder.onstop = () => {
-            const url = URL.createObjectURL(new Blob(chunks, { type: mime }));
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "trimmed_video.webm";
-            a.click();
-            setStatus("Done");
-            preview.pause();
-        };
+        try {
+            const formData = new URLSearchParams({
+                filename,
+                start: startTime,
+                end: endTime
+            });
 
-        recorder.start();
-        setTimeout(() => recorder.stop(), Math.max(200, (endTime - startTime) * 1000));
+            const response = await fetch("https://videotrimmer.online/backend/trim.php", {
+                method: "POST",
+                body: formData
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                preview.src = "https://videotrimmer.online/backend/" + data.url;
+                preview.load();
+                setStatus("Trim complete!");
+            } else {
+                alert("Trimming failed: " + (data.error || "Unknown error"));
+                setStatus("Ready");
+            }
+        } catch (err) {
+            alert("Server error: " + err.message);
+            setStatus("Ready");
+        }
     });
 
     resetBtn.addEventListener("click", () => {
@@ -460,6 +453,5 @@ document.addEventListener("DOMContentLoaded", () => {
         if (isFinite(t)) preview.currentTime = t;
     });
 
-    // initial mask update in case timeline has fixed size before any video loaded
     requestAnimationFrame(updateMasks);
 });
