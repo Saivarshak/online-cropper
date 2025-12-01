@@ -8,7 +8,7 @@ body {
     font-family: Arial, system-ui, -apple-system, Segoe UI, Roboto, Helvetica;
     padding: 20px; 
     margin: 0;
-    background: #f7fbfbff;
+    background: rgb(228, 255, 255);
     color: #eaf6ff;
 }
 
@@ -109,7 +109,7 @@ h1, h2 { text-align: center; font-weight: 600; }
 .time-label {
     position: absolute;
     top: -25px;
-    background: #00cfff;
+    background: #fcfefe;
     padding: 2px 5px;
     font-size: 12px;
     border-radius: 4px;
