@@ -1,14 +1,12 @@
-// Full main JS including black-transparent mask effect + bounded selection highlight + server-side trimming
+// -----------------------------
+// VIDEO TRIMMER JS (Clean & Single Block)
+// -----------------------------
 document.addEventListener("DOMContentLoaded", () => {
-    const urlInput = document.getElementById("loadBtn"); 
-    const loadBtn = document.querySelector("button#loadBtn");
-    const uploadBtn = document.getElementById("openFile");
+    // -----------------------------
+    // ELEMENTS
+    // -----------------------------
     const preview = document.getElementById("preview");
-
-    const fileInput = document.createElement("input");
-    fileInput.type = "file";
-    fileInput.accept = "video/*";
-
+    const trimmedVideo = document.getElementById("trimmedvideo");
     const timelineWrap = document.getElementById("timelineWrap");
     const thumbStrip = document.getElementById("thumbStrip");
     const startHandle = document.getElementById("startHandle");
@@ -17,27 +15,29 @@ document.addEventListener("DOMContentLoaded", () => {
     const endBubble = document.getElementById("endBubble");
     const trimBtn = document.getElementById("trimBtn");
     const resetBtn = document.getElementById("resetBtn");
-    const status = document.getElementById("status");
+    const downloadBtn = document.getElementById("downloadTrimBtn");
+    const uploadBtn = document.getElementById("openFile"); // button to open file input
 
+    // -----------------------------
+    // STATE
+    // -----------------------------
     let videoDuration = 0;
     let startTime = 0;
     let endTime = 0;
     let thumbnailsCanvas = null;
     let thumbnailsCtx = null;
+    let lastUploadedFilename = null;
+    let lastTrimmedUrl = null;
+    let currentFileObject = null;
+    let isUploadComplete = false;
 
-    function setStatus(msg) {
-        if (status) status.textContent = msg || "";
-    }
-
-    function scrollToPreview() {
-        preview.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-
+    // -----------------------------
+    // HELPERS
+    // -----------------------------
     function formatTime(sec) {
-        if (!isFinite(sec) || sec < 0) sec = 0;
         const m = Math.floor(sec / 60);
         const s = Math.floor(sec % 60);
-        return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+        return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
     }
 
     function updateBubbles() {
@@ -45,8 +45,16 @@ document.addEventListener("DOMContentLoaded", () => {
         endBubble.textContent = formatTime(endTime);
     }
 
+    function scrollToPreview() {
+        preview.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    function setStatus(msg) {
+        console.log(msg || "");
+    }
+
     // -----------------------------
-    // MASKS + BOUNDED SELECTION HIGHLIGHT
+    // MASKS + SELECTION
     // -----------------------------
     const leftMask = document.createElement("div");
     const rightMask = document.createElement("div");
@@ -60,24 +68,14 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     leftMask.style.background = "rgba(0,0,0,0.65)";
-    leftMask.style.zIndex = "20";
-
     rightMask.style.background = "rgba(0,0,0,0.65)";
-    rightMask.style.zIndex = "20";
-
     selectionOverlay.style.background = "transparent";
     selectionOverlay.style.border = "4px solid rgba(0,123,255,0.95)";
     selectionOverlay.style.boxShadow = "0 0 8px rgba(0,123,255,0.25)";
     selectionOverlay.style.borderRadius = "12px";
-    selectionOverlay.style.zIndex = "25";
 
-    leftMask.id = "leftMask";
-    rightMask.id = "rightMask";
-    selectionOverlay.id = "selectionOverlay";
+    if (getComputedStyle(timelineWrap).position === "static") timelineWrap.style.position = "relative";
 
-    if (getComputedStyle(timelineWrap).position === "static") {
-        timelineWrap.style.position = "relative";
-    }
     timelineWrap.appendChild(leftMask);
     timelineWrap.appendChild(rightMask);
     timelineWrap.appendChild(selectionOverlay);
@@ -85,10 +83,8 @@ document.addEventListener("DOMContentLoaded", () => {
     function updateMasks() {
         const rect = timelineWrap.getBoundingClientRect();
         const timelineW = rect.width || 0;
-
-        const startPx = Math.max(0, Math.min(timelineW, parseFloat(startHandle.style.left) || 0));
-        const endPxCandidate = parseFloat(endHandle.style.left);
-        const endPx = isFinite(endPxCandidate) ? Math.max(0, Math.min(timelineW, endPxCandidate)) : timelineW;
+        const startPx = parseFloat(startHandle.style.left) || 0;
+        const endPx = parseFloat(endHandle.style.left) || timelineW;
 
         leftMask.style.left = "0px";
         leftMask.style.width = `${startPx}px`;
@@ -100,99 +96,32 @@ document.addEventListener("DOMContentLoaded", () => {
         const selWidth = Math.max(0, endPx - startPx);
         selectionOverlay.style.left = `${selLeft}px`;
         selectionOverlay.style.width = `${selWidth}px`;
-
         selectionOverlay.style.opacity = selWidth < 8 ? "0" : "1";
     }
 
-    // ----------------------------------
-
-    function loadVideoFromURL() {
-        const val = (urlInput && urlInput.value) ? urlInput.value.trim() : "";
-        if (!val) return;
-        setStatus("Loading video...");
-        preview.crossOrigin = "anonymous";
-        preview.src = val;
-        preview.load();
-
-        preview.onloadedmetadata = () => {
-            videoDuration = preview.duration || 0;
-            startTime = 0;
-            endTime = videoDuration;
-            updateBubbles();
-            scrollToPreview();
-            requestAnimationFrame(() => {
-                startHandle.style.left = "0px";
-                const rect = timelineWrap.getBoundingClientRect();
-                endHandle.style.left = Math.max(0, rect.width - 14) + "px";
-                updateMasks();
-            });
-            generateThumbnails(preview.src).catch(() => setStatus("Ready"));
-            setStatus("Ready");
-        };
-    }
-
-    function loadVideoFromFile(file) {
-        if (!file) return;
-        setStatus("Loading video...");
-        const url = URL.createObjectURL(file);
-        preview.src = url;
-        if (urlInput) urlInput.value = url;
-        preview.removeAttribute("crossorigin");
-        preview.load();
-
-        preview.onloadedmetadata = () => {
-            videoDuration = preview.duration || 0;
-            startTime = 0;
-            endTime = videoDuration;
-            updateBubbles();
-            scrollToPreview();
-            requestAnimationFrame(() => {
-                startHandle.style.left = "0px";
-                const rect = timelineWrap.getBoundingClientRect();
-                endHandle.style.left = Math.max(0, rect.width - 14) + "px";
-                updateMasks();
-            });
-            generateThumbnails(preview.src).catch(() => setStatus("Ready"));
-            setStatus("Ready");
-        };
-    }
-
-    uploadBtn.addEventListener("click", () => fileInput.click());
-    fileInput.addEventListener("change", e => {
-        const file = e.target.files[0];
-        if (file) loadVideoFromFile(file);
-    });
-
-    if (loadBtn) loadBtn.addEventListener("click", loadVideoFromURL);
-
+    // -----------------------------
+    // DRAG HANDLES
+    // -----------------------------
     function makeDraggable(handle, isStart) {
         handle.addEventListener("mousedown", (e) => {
             e.preventDefault();
-            const handleRect = handle.getBoundingClientRect();
-            const grabOffset = e.clientX - handleRect.left;
+            const grabOffset = e.clientX - handle.getBoundingClientRect().left;
 
             function onMove(ev) {
                 const rect = timelineWrap.getBoundingClientRect();
-                let pos = ev.clientX - rect.left - grabOffset + (handleRect.width / 2);
+                let pos = ev.clientX - rect.left - grabOffset + (handle.offsetWidth / 2);
                 pos = Math.max(0, Math.min(pos, rect.width));
-                const percent = pos / rect.width;
 
                 if (isStart) {
-                    startTime = videoDuration * percent;
+                    const endPx = parseFloat(endHandle.style.left) || rect.width;
+                    pos = Math.min(pos, endPx);
+                    startTime = (pos / rect.width) * videoDuration;
                     startHandle.style.left = pos + "px";
                 } else {
-                    endTime = videoDuration * percent;
+                    const startPx = parseFloat(startHandle.style.left) || 0;
+                    pos = Math.max(pos, startPx);
+                    endTime = (pos / rect.width) * videoDuration;
                     endHandle.style.left = pos + "px";
-                }
-
-                if (startTime > endTime) {
-                    if (isStart) {
-                        startTime = endTime;
-                        startHandle.style.left = endHandle.style.left;
-                    } else {
-                        endTime = startTime;
-                        endHandle.style.left = startHandle.style.left;
-                    }
                 }
 
                 updateBubbles();
@@ -207,59 +136,72 @@ document.addEventListener("DOMContentLoaded", () => {
             document.addEventListener("mousemove", onMove);
             document.addEventListener("mouseup", onUp);
         });
-
-        handle.addEventListener("touchstart", (e) => {
-            e.preventDefault();
-            const touch = e.touches[0];
-            const handleRect = handle.getBoundingClientRect();
-            const grabOffset = touch.clientX - handleRect.left;
-
-            function onTouchMove(ev) {
-                const t = ev.touches[0];
-                const rect = timelineWrap.getBoundingClientRect();
-                let pos = t.clientX - rect.left - grabOffset + (handleRect.width / 2);
-                pos = Math.max(0, Math.min(pos, rect.width));
-                const percent = pos / rect.width;
-
-                if (isStart) {
-                    startTime = videoDuration * percent;
-                    startHandle.style.left = pos + "px";
-                } else {
-                    endTime = videoDuration * percent;
-                    endHandle.style.left = pos + "px";
-                }
-
-                if (startTime > endTime) {
-                    if (isStart) {
-                        startTime = endTime;
-                        startHandle.style.left = endHandle.style.left;
-                    } else {
-                        endTime = startTime;
-                        endHandle.style.left = startHandle.style.left;
-                    }
-                }
-
-                updateBubbles();
-                updateMasks();
-            }
-
-            function onTouchEnd() {
-                document.removeEventListener("touchmove", onTouchMove);
-                document.removeEventListener("touchend", onTouchEnd);
-            }
-
-            document.addEventListener("touchmove", onTouchMove, { passive: false });
-            document.addEventListener("touchend", onTouchEnd);
-        });
     }
 
     makeDraggable(startHandle, true);
     makeDraggable(endHandle, false);
 
-    async function generateThumbnails(videoSrc) {
-        setStatus("Generating thumbnails...");
-        thumbStrip.innerHTML = "";
+    // -----------------------------
+    // FILE INPUT
+    // -----------------------------
+    const fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = "video/*";
+    fileInput.style.display = "none";
+    document.body.appendChild(fileInput);
 
+    if (uploadBtn) uploadBtn.addEventListener("click", () => fileInput.click());
+
+    async function loadVideoFromFile(file) {
+        if (!file) return;
+        currentFileObject = file;
+
+        // Preview
+        preview.src = URL.createObjectURL(file);
+        preview.load();
+        preview.onloadedmetadata = () => {
+            videoDuration = preview.duration;
+            startTime = 0;
+            endTime = videoDuration;
+            startHandle.style.left = "0px";
+            endHandle.style.left = (timelineWrap.getBoundingClientRect().width - 14) + "px";
+            updateBubbles();
+            updateMasks();
+            scrollToPreview();
+        };
+
+        // Generate thumbnails
+        generateThumbnails(preview.src);
+
+        // Upload to server
+        isUploadComplete = false;
+        try {
+            setStatus("Uploading...");
+            const fd = new FormData();
+            fd.append("video", file);
+            const res = await fetch("http://localhost:5000/upload", { method: "POST", body: fd });
+            const data = await res.json();
+            lastUploadedFilename = data.videoPath || data.url || null;
+            isUploadComplete = true;
+            setStatus("Upload complete");
+        } catch (err) {
+            console.error("Upload failed:", err);
+            setStatus("Upload failed");
+            isUploadComplete = false;
+        }
+    }
+
+    fileInput.addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        loadVideoFromFile(file);
+    });
+
+    // -----------------------------
+    // GENERATE THUMBNAILS
+    // -----------------------------
+    async function generateThumbnails(videoSrc) {
+        if (!thumbStrip) return;
+        thumbStrip.innerHTML = "";
         const width = Math.max(200, timelineWrap.clientWidth || 600);
         const thumbHeight = Math.max(48, Math.floor((timelineWrap.clientHeight || 80) * 0.95));
         thumbnailsCanvas = document.createElement("canvas");
@@ -267,8 +209,6 @@ document.addEventListener("DOMContentLoaded", () => {
         thumbnailsCanvas.height = thumbHeight;
         thumbnailsCanvas.style.width = "100%";
         thumbnailsCanvas.style.height = thumbHeight + "px";
-        thumbnailsCanvas.style.display = "block";
-        thumbnailsCanvas.style.objectFit = "cover";
         thumbnailsCtx = thumbnailsCanvas.getContext("2d");
         thumbStrip.appendChild(thumbnailsCanvas);
 
@@ -288,164 +228,106 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         const duration = tempVideo.duration || videoDuration;
-        const times = [];
-
-        for (let i = 0; i < numThumbs; i++) {
-            times.push((i / (numThumbs - 1)) * duration);
-        }
-
-        function seekTo(time) {
-            return new Promise((resolve) => {
-                tempVideo.currentTime = Math.min(time, tempVideo.duration - 0.001);
-                tempVideo.addEventListener("seeked", resolve, { once: true });
-                setTimeout(resolve, 2000);
-            });
-        }
+        const times = Array.from({ length: numThumbs }, (_, i) => (i / (numThumbs - 1)) * duration);
 
         for (let i = 0; i < times.length; i++) {
-            await seekTo(times[i]);
+            await new Promise(resolve => {
+                tempVideo.currentTime = Math.min(times[i], tempVideo.duration - 0.001);
+                tempVideo.addEventListener("seeked", resolve, { once: true });
+                setTimeout(resolve, 1000); // fallback
+            });
             const dx = i * actualThumbW;
             const dy = 0;
             const dw = actualThumbW;
             const dh = thumbHeight;
-
             thumbnailsCtx.fillStyle = "#123a66";
             thumbnailsCtx.fillRect(dx, dy, dw, dh);
-
             try {
                 const videoRatio = tempVideo.videoWidth / tempVideo.videoHeight;
                 const canvasRatio = dw / dh;
                 let drawW, drawH, drawX, drawY;
-
                 if (videoRatio > canvasRatio) {
-                    drawH = dh;
-                    drawW = dh * videoRatio;
-                    drawX = dx - (drawW - dw) / 2;
-                    drawY = 0;
+                    drawH = dh; drawW = dh * videoRatio; drawX = dx - (drawW - dw) / 2; drawY = 0;
                 } else {
-                    drawW = dw;
-                    drawH = dw / videoRatio;
-                    drawX = dx;
-                    drawY = -(drawH - dh) / 2;
+                    drawW = dw; drawH = dw / videoRatio; drawX = dx; drawY = -(drawH - dh) / 2;
                 }
-
                 thumbnailsCtx.drawImage(tempVideo, drawX, drawY, drawW, drawH);
-            } catch (err) {}
+            } catch (err) { }
         }
-
-        requestAnimationFrame(() => {
-            const rect = timelineWrap.getBoundingClientRect();
-            endHandle.style.left = Math.max(0, rect.width - 14) + "px";
-            updateMasks();
-        });
-
-        setStatus("Ready");
     }
 
-    // --------------------------
-    // SERVER-SIDE TRIM INTEGRATION
-    // --------------------------
+    // -----------------------------
+    // TRIM & PREVIEW
+    // -----------------------------
     trimBtn.addEventListener("click", async () => {
-        if (!preview.src) {
-            alert("Load a video first");
-            return;
-        }
-
-        setStatus("Trimming…");
+        if (!currentFileObject) return alert("No video loaded.");
 
         const rect = timelineWrap.getBoundingClientRect();
         const timelineWidth = rect.width || 1;
-        const startLeft = parseFloat(startHandle.style.left) || 0;
-        const endLeft = parseFloat(endHandle.style.left) || timelineWidth;
-        const computedStart = (startLeft / timelineWidth) * videoDuration;
-        const computedEnd = (endLeft / timelineWidth) * videoDuration;
+        startTime = (parseFloat(startHandle.style.left) || 0) / timelineWidth * videoDuration;
+        endTime = (parseFloat(endHandle.style.left) || timelineWidth) / timelineWidth * videoDuration;
 
-        startTime = Math.max(0, Math.min(videoDuration, computedStart));
-        endTime = Math.max(0, Math.min(videoDuration, computedEnd));
+        if (startTime >= endTime) return alert("Start must be before end.");
 
-        if (startTime >= endTime) {
-            alert("Start must be before end");
-            setStatus("Ready");
-            return;
-        }
+        // Local preview
+        trimmedVideo.src = preview.src;
+        trimmedVideo.currentTime = startTime;
+        trimmedVideo.play().catch(() => { });
+        trimmedVideo.scrollIntoView({ behavior: "smooth", block: "center" });
 
-        let filename = "";
-        if (preview.src.includes("/backend/uploads/")) {
-            filename = preview.src.split("/backend/uploads/")[1];
-        } else {
-            alert("Uploaded video not recognized for server trim.");
-            setStatus("Ready");
-            return;
-        }
-
-        try {
-            const formData = new URLSearchParams({
-                filename,
-                start: startTime,
-                end: endTime
-            });
-
-            const response = await fetch("https://videotrimmer.online/backend/trim.php", {
-                method: "POST",
-                body: formData
-            });
-
-            const data = await response.json();
-            if (data.success) {
-                preview.src = "https://videotrimmer.online/backend/" + data.url;
-                preview.load();
-                setStatus("Trim complete!");
-            } else {
-                alert("Trimming failed: " + (data.error || "Unknown error"));
-                setStatus("Ready");
+        // Server trim
+        if (isUploadComplete && lastUploadedFilename) {
+            try {
+                const res = await fetch("http://localhost:5000/trim", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ inputPath: lastUploadedFilename, start: startTime, end: endTime })
+                });
+                const data = await res.json();
+                lastTrimmedUrl = "http://localhost:5000/" + (data.output || data.url);
+                setStatus("Trim complete. Preview below.");
+            } catch (err) {
+                console.error("Server trim failed:", err);
+                setStatus("Trim failed");
             }
-        } catch (err) {
-            alert("Server error: " + err.message);
-            setStatus("Ready");
         }
     });
 
+    // -----------------------------
+    // DOWNLOAD
+    // -----------------------------
+    downloadBtn.addEventListener("click", async () => {
+        if (!lastTrimmedUrl) return alert("No trimmed video to download.");
+        try {
+            const res = await fetch(lastTrimmedUrl);
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "trimmed_video.mp4";
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            alert("Download failed: " + err.message);
+        }
+    });
+
+    // -----------------------------
+    // RESET
+    // -----------------------------
     resetBtn.addEventListener("click", () => {
+        startHandle.style.left = "0px";
+        endHandle.style.left = (timelineWrap.getBoundingClientRect().width - 14) + "px";
         startTime = 0;
         endTime = videoDuration;
-        startHandle.style.left = "0px";
-
-        requestAnimationFrame(() => {
-            const rect = timelineWrap.getBoundingClientRect();
-            endHandle.style.left = Math.max(0, rect.width - 14) + "px";
-            updateMasks();
-        });
-
         updateBubbles();
+        updateMasks();
+        setStatus("Ready");
     });
 
-    window.addEventListener("resize", () => {
-        requestAnimationFrame(() => {
-            const rect = timelineWrap.getBoundingClientRect();
-            const percent = videoDuration ? endTime / videoDuration : 1;
-            endHandle.style.left = Math.max(0, rect.width * percent - 14) + "px";
-            updateMasks();
-
-            if (preview.src) {
-                if (window._thumbResizeTimer) clearTimeout(window._thumbResizeTimer);
-                window._thumbResizeTimer = setTimeout(() => {
-                    generateThumbnails(preview.src);
-                }, 300);
-            }
-        });
-    });
-
-    if (preview && preview.src) {
-        preview.addEventListener("loadedmetadata", () => {
-            videoDuration = preview.duration;
-            startTime = 0;
-            endTime = videoDuration;
-            updateBubbles();
-            updateMasks();
-            generateThumbnails(preview.src);
-        }, { once: true });
-    }
-
+    // -----------------------------
+    // TIMELINE CLICK SEEK
+    // -----------------------------
     timelineWrap.addEventListener("click", (e) => {
         const rect = timelineWrap.getBoundingClientRect();
         const pos = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
@@ -454,4 +336,67 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     requestAnimationFrame(updateMasks);
+});
+
+
+
+const video = document.getElementById("trimmedvideo");
+const timeline = document.getElementById("timelineContainer");
+const startHandle = document.getElementById("startHandle");
+const endHandle = document.getElementById("endHandle");
+const selection = document.getElementById("selection");
+
+let dragging = null;
+let startTime = 0;
+let endTime = 0;
+
+// Update handle positions and selection overlay
+function updateHandles() {
+  const width = timeline.clientWidth;
+  startHandle.style.left = (startTime / video.duration * width) + "px";
+  endHandle.style.left = (endTime / video.duration * width) + "px";
+  selection.style.left = startHandle.style.left;
+  selection.style.width = (parseFloat(endHandle.style.left) - parseFloat(startHandle.style.left)) + "px";
+}
+
+// Initialize after video metadata loads
+video.addEventListener("loadedmetadata", () => {
+  endTime = video.duration;
+  updateHandles();
+});
+
+// Start dragging
+timeline.addEventListener("mousedown", (e) => {
+  if (e.target === startHandle) dragging = "start";
+  else if (e.target === endHandle) dragging = "end";
+});
+
+// Drag movement
+window.addEventListener("mousemove", (e) => {
+  if (!dragging) return;
+  const rect = timeline.getBoundingClientRect();
+  let pos = e.clientX - rect.left;
+  pos = Math.max(0, Math.min(pos, timeline.clientWidth));
+  const time = pos / timeline.clientWidth * video.duration;
+
+  if (dragging === "start") startTime = Math.min(time, endTime - 0.1);
+  else if (dragging === "end") endTime = Math.max(time, startTime + 0.1);
+
+  updateHandles();
+});
+
+// Stop dragging
+window.addEventListener("mouseup", () => dragging = null);
+
+// Clamp playback to trimmed segment
+video.addEventListener("timeupdate", () => {
+  if (video.currentTime < startTime) video.currentTime = startTime;
+  if (video.currentTime > endTime) video.pause();
+});
+
+// Start playing from startTime if outside segment
+video.addEventListener("play", () => {
+  if (video.currentTime < startTime || video.currentTime > endTime) {
+    video.currentTime = startTime;
+  }
 });
