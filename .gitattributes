@@ -1,0 +1,2 @@
+uploads/*.mp4 filter=lfs diff=lfs merge=lfs -text
+node_modules/ffmpeg-static/ffmpeg.exe filter=lfs diff=lfs merge=lfs -text
