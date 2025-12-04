@@ -182,8 +182,9 @@ document.addEventListener("DOMContentLoaded", () => {
             lastUploadedFilename = data.filename;
             isUploadComplete = true;
             setStatus("Upload complete");
-        } catch {
-            setStatus("Upload failed");
+        } catch (err) {
+            setStatus("Upload failed: " + err.message);
+            alert("Upload failed: " + err.message);
             isUploadComplete = false;
         }
     };
@@ -266,9 +267,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (!data.success) return alert("Trim failed: " + data.error);
 
                 lastTrimmedUrl = `${API}${data.url}`;
+                trimmedVideo.src = lastTrimmedUrl;
+                trimmedVideo.currentTime = 0;
+                trimmedVideo.play().catch(() => {});
                 console.log("Trimmed file:", lastTrimmedUrl);
             } catch (err) {
                 console.error("Server trim failed:", err);
+                alert("Server trim failed: " + err.message);
             }
         }
     });
@@ -285,11 +290,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const link = URL.createObjectURL(blob);
             const a = document.createElement("a");
-
             a.href = link;
             a.download = "trimmed_video.mp4";
             a.click();
-
             URL.revokeObjectURL(link);
         } catch (err) {
             alert("Download failed: " + err.message);
@@ -321,4 +324,5 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     requestAnimationFrame(updateMasks);
+    window.addEventListener("resize", updateMasks);
 });
