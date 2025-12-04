@@ -18,8 +18,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const endBubble = document.getElementById("endBubble");
     const trimBtn = document.getElementById("trimBtn");
     const resetBtn = document.getElementById("resetBtn");
-    const downloadBtn = document.getElementById("downloadTrimBtn");
-    const uploadBtn = document.getElementById("openFile");
+    const downloadBtn = document.getElementById("downloadBtn");
+    const uploadBtn = document.getElementById("videoFile");
 
     // -----------------------------
     // STATE
