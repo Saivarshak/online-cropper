@@ -3,6 +3,8 @@
 // -----------------------------
 document.addEventListener("DOMContentLoaded", () => {
 
+    const API = "https://video-trimmer-backend.onrender.com";
+
     // -----------------------------
     // ELEMENTS
     // -----------------------------
@@ -32,9 +34,6 @@ document.addEventListener("DOMContentLoaded", () => {
     let currentFileObject = null;
     let isUploadComplete = false;
 
-    // -----------------------------
-    // HELPERS
-    // -----------------------------
     const formatTime = sec => {
         const m = Math.floor(sec / 60);
         const s = Math.floor(sec % 60);
@@ -107,7 +106,6 @@ document.addEventListener("DOMContentLoaded", () => {
             const move = ev => {
                 const rect = timelineWrap.getBoundingClientRect();
                 let x = ev.clientX - rect.left - offset + handle.offsetWidth / 2;
-
                 x = Math.max(0, Math.min(x, rect.width));
 
                 if (isStart) {
@@ -149,7 +147,6 @@ document.addEventListener("DOMContentLoaded", () => {
     document.body.appendChild(fileInput);
 
     uploadBtn.addEventListener("click", () => fileInput.click());
-
     fileInput.addEventListener("change", e => loadVideo(e.target.files[0]));
 
     const loadVideo = async file => {
@@ -172,7 +169,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
         generateThumbnails(preview.src);
 
-        // Upload
         isUploadComplete = false;
 
         try {
@@ -180,12 +176,10 @@ document.addEventListener("DOMContentLoaded", () => {
             const fd = new FormData();
             fd.append("video", file);
 
-            const res = await fetch("http://localhost:5000/upload", { method: "POST", body: fd });
+            const res = await fetch(`${API}/upload`, { method: "POST", body: fd });
             const data = await res.json();
 
-            // IMPORTANT FIX
             lastUploadedFilename = data.filename;
-
             isUploadComplete = true;
             setStatus("Upload complete");
         } catch {
@@ -195,7 +189,7 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     // -----------------------------
-    // THUMBNAIL GENERATION
+    // THUMBNAILS
     // -----------------------------
     const generateThumbnails = async src => {
         thumbStrip.innerHTML = "";
@@ -223,7 +217,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
         for (let i = 0; i < num; i++) {
             const t = i * step;
-
             await new Promise(r => {
                 temp.currentTime = t;
                 temp.addEventListener("seeked", r, { once: true });
@@ -239,7 +232,7 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     // -----------------------------
-    // TRIM + LOCAL PREVIEW + SERVER TRIM
+    // TRIM
     // -----------------------------
     trimBtn.addEventListener("click", async () => {
         if (!currentFileObject) return alert("No video loaded.");
@@ -252,26 +245,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (startTime >= endTime) return alert("Start must be before end.");
 
-        // Local preview
         trimmedVideo.src = preview.src;
         trimmedVideo.currentTime = startTime;
         trimmedVideo.play().catch(() => {});
         trimmedVideo.scrollIntoView({ behavior: "smooth", block: "center" });
 
-        // Server trim
         if (isUploadComplete && lastUploadedFilename) {
             try {
-                const res = await fetch("http://localhost:5000/trim", {
+                const res = await fetch(`${API}/trim`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ filename: lastUploadedFilename, start: startTime, end: endTime })
+                    body: JSON.stringify({
+                        filename: lastUploadedFilename,
+                        start: startTime,
+                        end: endTime
+                    })
                 });
 
                 const data = await res.json();
-
                 if (!data.success) return alert("Trim failed: " + data.error);
 
-                lastTrimmedUrl = "http://localhost:5000" + data.url;
+                lastTrimmedUrl = `${API}${data.url}`;
                 console.log("Trimmed file:", lastTrimmedUrl);
             } catch (err) {
                 console.error("Server trim failed:", err);
@@ -291,9 +285,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const link = URL.createObjectURL(blob);
             const a = document.createElement("a");
+
             a.href = link;
             a.download = "trimmed_video.mp4";
             a.click();
+
             URL.revokeObjectURL(link);
         } catch (err) {
             alert("Download failed: " + err.message);
@@ -306,8 +302,10 @@ document.addEventListener("DOMContentLoaded", () => {
     resetBtn.addEventListener("click", () => {
         startHandle.style.left = "0px";
         endHandle.style.left = timelineWrap.clientWidth - 14 + "px";
+
         startTime = 0;
         endTime = videoDuration;
+
         updateBubbles();
         updateMasks();
     });
@@ -323,14 +321,4 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     requestAnimationFrame(updateMasks);
-});
-
-
-const API = "https://video-trimmer-backend.onrender.com";
-
-await fetch(`${API}/upload`, { method: "POST", body: fd });
-await fetch(`${API}/trim`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ filename: lastUploadedFilename, start: startTime, end: endTime })
 });
