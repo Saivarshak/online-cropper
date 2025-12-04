@@ -197,10 +197,12 @@
                         <br><br><br>
 
                         <button id="loadBtn" style="margin-bottom:10px; margin-right:10px">Load Video</button>
-                        <input type="file" id="openFile" accept="video/mp4,video/webm" style="margin-bottom:10px;">
+                      <!--  <input type="file" id="openFile" accept="video/mp4,video/webm" style="margin-bottom:10px;"> -->
+                      <input type="file" id="videoFile" accept="video/mp4,video/*">
+
 
                         <br><br>
-                    </div>
+                    </div>  
 
                     <div class="grid-button flex gap25 items-center">
                     </div>
@@ -291,7 +293,9 @@
             <div class="url-input" title="Paste a direct MP4/WEBM link here or use the upload button."></div>
           </div>
             <video id="trimmedvideo" controls playsinline style="width:100%;"></video>
-            <button id="downloadTrimBtn">Download Trimmed Video</button>
+         <!--   <button id="downloadTrimBtn">Download Trimmed Video</button> -->
+         <button id="downloadBtn">Download Trimmed Video</button>
+
 
 
         </div>
