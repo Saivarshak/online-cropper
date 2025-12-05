@@ -122,7 +122,7 @@ document.addEventListener("DOMContentLoaded", () => {
     updateBubbles();
   }
 
-  // --- Upload (AUTO SCROLL ADDED)
+  // --- Upload (AUTO SCROLL FIXED)
   async function uploadFile(file) {
     if (!file) return;
     try {
@@ -136,8 +136,11 @@ document.addEventListener("DOMContentLoaded", () => {
       lastUploadedFilename = data.filename;
       setStatus("Upload complete");
 
-      // AUTO SCROLL ADDED HERE
-      autoScrollTo("preview");
+      // --- Auto scroll after preview metadata is loaded
+      preview.addEventListener("loadedmetadata", function scrollOnce() {
+        autoScrollTo("preview");
+        preview.removeEventListener("loadedmetadata", scrollOnce);
+      });
 
     } catch (err) {
       alert("Upload failed: " + err.message);
@@ -256,8 +259,6 @@ document.addEventListener("DOMContentLoaded", () => {
     syncHandlesToTimes();
   });
 });
-
-
 
 // --- Auto Scroll Function ---
 function autoScrollTo(elementId) {
