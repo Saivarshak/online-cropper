@@ -271,3 +271,15 @@ function autoScrollTo(elementId) {
     behavior: "smooth"
   });
 }
+
+const handles = [document.getElementById("startHandle"), document.getElementById("endHandle")];
+
+handles.forEach(handle => {
+    handle.addEventListener("mousedown", () => {
+        handle.classList.add("dragging");
+    });
+
+    document.addEventListener("mouseup", () => {
+        handle.classList.remove("dragging");
+    });
+});
