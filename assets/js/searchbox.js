@@ -2,7 +2,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const API = "https://video-trimmer-backend.onrender.com";
 
-    // VALID ELEMENTS ONLY (checked)
+    // ELEMENTS (only used ones)
     const preview = document.getElementById("preview");
     const trimmedVideo = document.getElementById("trimmedvideo");
     const timelineWrap = document.getElementById("timelineWrap");
@@ -23,17 +23,9 @@ document.addEventListener("DOMContentLoaded", () => {
     let currentFileObject = null;
     let isUploadComplete = false;
 
-    const formatTime = sec => {
-        const m = Math.floor(sec / 60);
-        const s = Math.floor(sec % 60);
-        return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-    };
-
     const setStatus = msg => console.log(msg || "");
 
-    // -----------------------------
-    // OVERLAY MASKS
-    // -----------------------------
+    // MASKS
     const leftMask = document.createElement("div");
     const rightMask = document.createElement("div");
     const selectionOverlay = document.createElement("div");
@@ -77,9 +69,7 @@ document.addEventListener("DOMContentLoaded", () => {
         selectionOverlay.style.opacity = selW < 8 ? "0" : "1";
     };
 
-    // -----------------------------
-    // HANDLE DRAGGING
-    // -----------------------------
+    // DRAG HANDLES
     const makeDraggable = (handle, isStart) => {
         if (!handle || !timelineWrap) return;
 
@@ -120,18 +110,14 @@ document.addEventListener("DOMContentLoaded", () => {
     makeDraggable(startHandle, true);
     makeDraggable(endHandle, false);
 
-    // -----------------------------
     // FILE INPUT
-    // -----------------------------
     const fileInput = document.createElement("input");
     fileInput.type = "file";
     fileInput.accept = "video/*";
     fileInput.style.display = "none";
     document.body.appendChild(fileInput);
 
-    // Auto-open when user clicks preview
     preview.addEventListener("click", () => fileInput.click());
-
     fileInput.addEventListener("change", e => loadVideo(e.target.files[0]));
 
     const loadVideo = async file => {
@@ -166,15 +152,12 @@ document.addEventListener("DOMContentLoaded", () => {
             isUploadComplete = true;
             setStatus("Upload complete");
         } catch (err) {
-            setStatus("Upload failed: " + err.message);
             alert("Upload failed: " + err.message);
             isUploadComplete = false;
         }
     };
 
-    // -----------------------------
     // THUMBNAILS
-    // -----------------------------
     const generateThumbnails = async src => {
         if (!thumbStrip || !timelineWrap) return;
 
@@ -217,9 +200,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
-    // -----------------------------
     // TRIM
-    // -----------------------------
     if (trimBtn) {
         trimBtn.addEventListener("click", async () => {
             if (!currentFileObject || !timelineWrap) {
@@ -271,9 +252,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // -----------------------------
     // RESET
-    // -----------------------------
     if (resetBtn) {
         resetBtn.addEventListener("click", () => {
             if (!timelineWrap) return;
@@ -288,9 +267,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // -----------------------------
     // TIMELINE SEEK
-    // -----------------------------
     if (timelineWrap && preview) {
         timelineWrap.addEventListener("click", e => {
             const rect = timelineWrap.getBoundingClientRect();
