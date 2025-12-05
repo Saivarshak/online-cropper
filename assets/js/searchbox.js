@@ -1,7 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
   const API = "https://video-trimmer-backend.onrender.com";
 
-  // --- Elements (keep same IDs as HTML)
+  // --- Elements
   const preview = document.getElementById("preview");
   const trimmedVideo = document.getElementById("trimmedvideo");
   const timelineWrap = document.getElementById("timelineWrap");
@@ -11,17 +11,14 @@ document.addEventListener("DOMContentLoaded", () => {
   const startBubble = document.getElementById("startBubble");
   const endBubble = document.getElementById("endBubble");
 
+  const fileInput = document.getElementById("openFile");
   const urlInput = document.querySelector('input#loadBtn');
   const loadUrlBtn = document.querySelector('button#loadVideoBtn');
-  const fileInput = document.getElementById("openFile");
   const trimBtn = document.getElementById("trimBtn");
   const resetBtn = document.getElementById("resetBtn");
   const downloadTrimBtn = document.getElementById("downloadTrimBtn");
 
-  if (!preview || !trimmedVideo || !timelineWrap || !thumbStrip || !startHandle || !endHandle) {
-    console.warn("Required element missing.");
-    return;
-  }
+  if (!preview || !trimmedVideo || !timelineWrap || !startHandle || !endHandle) return;
 
   // --- State
   let videoDuration = 0;
@@ -30,9 +27,6 @@ document.addEventListener("DOMContentLoaded", () => {
   let currentFileObject = null;
   let lastUploadedFilename = null;
   let lastTrimmedUrl = null;
-  let thumbnailsCanvas = null;
-  let thumbnailsCtx = null;
-  let isUploadComplete = false;
 
   const setStatus = msg => console.log("[trimmer] " + (msg || ""));
 
@@ -49,13 +43,13 @@ document.addEventListener("DOMContentLoaded", () => {
   leftMask.style.background = rightMask.style.background = "rgba(0,0,0,0.65)";
   selectionOverlay.style.border = "4px solid rgba(0,123,255,0.95)";
   selectionOverlay.style.borderRadius = "10px";
+
   if (getComputedStyle(timelineWrap).position === "static") timelineWrap.style.position = "relative";
   timelineWrap.append(leftMask, rightMask, selectionOverlay);
 
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const fmt = sec => !isFinite(sec) ? "00:00" : `${String(Math.floor(sec/60)).padStart(2,"0")}:${String(Math.floor(sec%60)).padStart(2,"0")}`;
 
-  // --- Update masks & bubbles
   function updateBubbles() {
     if (startBubble) startBubble.textContent = fmt(startTime);
     if (endBubble) endBubble.textContent = fmt(endTime);
@@ -64,7 +58,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function updateMasks() {
-    if (!timelineWrap) return;
     const w = timelineWrap.clientWidth || 0;
     const s = clamp(parseFloat(startHandle.style.left) || 0, 0, w);
     const e = clamp(parseFloat(endHandle.style.left) || w, 0, w);
@@ -76,7 +69,6 @@ document.addEventListener("DOMContentLoaded", () => {
     selectionOverlay.style.opacity = (e - s < 8 ? "0" : "1");
   }
 
-  // --- Draggable handles
   function makeDraggable(handle, isStart) {
     handle.style.position = "absolute";
     const startDrag = (clientX) => {
@@ -100,16 +92,23 @@ document.addEventListener("DOMContentLoaded", () => {
         updateBubbles();
       };
 
+      const onMouseMove = ev => onMove(ev.clientX);
+      const onTouchMove = ev => { if (ev.touches[0]) onMove(ev.touches[0].clientX); };
       const onUp = () => {
-        document.removeEventListener("mousemove", mm);
+        document.removeEventListener("mousemove", onMouseMove);
         document.removeEventListener("mouseup", onUp);
+        document.removeEventListener("touchmove", onTouchMove);
+        document.removeEventListener("touchend", onUp);
       };
-      const mm = e => onMove(e.clientX);
-      document.addEventListener("mousemove", mm);
+
+      document.addEventListener("mousemove", onMouseMove);
       document.addEventListener("mouseup", onUp);
+      document.addEventListener("touchmove", onTouchMove, { passive: true });
+      document.addEventListener("touchend", onUp);
     };
 
     handle.addEventListener("mousedown", e => { e.preventDefault(); startDrag(e.clientX); });
+    handle.addEventListener("touchstart", e => { if (e.touches[0]) startDrag(e.touches[0].clientX); }, { passive: true });
   }
 
   makeDraggable(startHandle, true);
@@ -123,10 +122,9 @@ document.addEventListener("DOMContentLoaded", () => {
     updateBubbles();
   }
 
-  // --- File upload function
+  // --- Upload
   async function uploadFile(file) {
     if (!file) return;
-    isUploadComplete = false;
     try {
       setStatus("Uploading...");
       const fd = new FormData();
@@ -135,98 +133,106 @@ document.addEventListener("DOMContentLoaded", () => {
       const data = await res.json();
       if (!data.success) throw new Error(data.error || "Upload failed");
       lastUploadedFilename = data.filename;
-      isUploadComplete = true;
       setStatus("Upload complete");
     } catch (err) {
       alert("Upload failed: " + err.message);
       setStatus("Upload failed: " + err.message);
-      isUploadComplete = false;
     }
   }
 
-  // --- File / URL selection
-  if (fileInput) fileInput.addEventListener("change", e => {
-    const f = e.target.files[0];
-    if (f) {
-      currentFileObject = f;
-      preview.src = URL.createObjectURL(f);
-      preview.load();
-      uploadFile(f);
-    }
-  });
+  // --- File selection
+  if (fileInput) {
+    fileInput.addEventListener("change", e => {
+      const f = e.target.files[0];
+      if (f) {
+        currentFileObject = f;
+        preview.src = URL.createObjectURL(f);
+        preview.load();
+        uploadFile(f);
+      }
+    });
+    preview.style.cursor = "pointer";
+    preview.addEventListener("click", () => fileInput.click());
+  }
 
-  if (loadUrlBtn && urlInput) loadUrlBtn.addEventListener("click", async () => {
-    const url = urlInput.value.trim();
-    if (!url) return alert("Paste a video URL.");
-    try {
-      const res = await fetch(url);
-      const blob = await res.blob();
-      const file = new File([blob], "remote_video.mp4", { type: blob.type || "video/mp4" });
-      currentFileObject = file;
-      preview.src = URL.createObjectURL(file);
-      preview.load();
-      uploadFile(file);
-    } catch {
-      preview.src = url;
-      currentFileObject = null;
-      alert("Server-side trimming may fail due to CORS.");
-    }
-  });
+  // --- Load from URL
+  if (loadUrlBtn && urlInput) {
+    loadUrlBtn.addEventListener("click", async () => {
+      const url = urlInput.value.trim();
+      if (!url) return alert("Paste a video URL");
+      try {
+        const res = await fetch(url);
+        const blob = await res.blob();
+        const file = new File([blob], "remote.mp4", { type: blob.type || "video/mp4" });
+        currentFileObject = file;
+        preview.src = URL.createObjectURL(file);
+        preview.load();
+        uploadFile(file);
+      } catch {
+        preview.src = url;
+        currentFileObject = null;
+        alert("Server-side trimming may fail due to CORS.");
+      }
+    });
+  }
 
-  preview.addEventListener("loadedmetadata", () => {
-    videoDuration = preview.duration || 0;
-    startTime = 0;
-    endTime = videoDuration;
-    syncHandlesToTimes();
-  });
+  // --- Trim (UPDATED: JSON body)
+  if (trimBtn) {
+    trimBtn.addEventListener("click", async () => {
+      if (!lastUploadedFilename) return alert("Upload the file first!");
+      const rect = timelineWrap.getBoundingClientRect();
+      const w = rect.width || 1;
+      startTime = (parseFloat(startHandle.style.left) || 0) / w * videoDuration;
+      endTime = (parseFloat(endHandle.style.left) || w) / w * videoDuration;
+      if (startTime >= endTime) return alert("Start must be before end.");
 
-  // --- Trim button
-  if (trimBtn) trimBtn.addEventListener("click", async () => {
-    if (!lastUploadedFilename) return alert("File not uploaded yet.");
-    const rect = timelineWrap.getBoundingClientRect();
-    const w = rect.width || 1;
-    startTime = (parseFloat(startHandle.style.left) || 0) / w * videoDuration;
-    endTime = (parseFloat(endHandle.style.left) || w) / w * videoDuration;
-    if (startTime >= endTime) return alert("Start must be before end.");
-    try {
-      const fd = new FormData();
-      fd.append("filename", lastUploadedFilename);
-      fd.append("start", String(startTime));
-      fd.append("end", String(endTime));
-      const res = await fetch(`${API}/trim`, { method: "POST", body: fd });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error || "Trim failed");
-      lastTrimmedUrl = `${API}${data.url}`;
-      trimmedVideo.src = lastTrimmedUrl;
-      trimmedVideo.currentTime = 0;
-      trimmedVideo.play().catch(() => {});
-    } catch (err) {
-      alert("Server trim failed: " + err.message);
-    }
-  });
+      try {
+        const res = await fetch(`${API}/trim`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            filename: lastUploadedFilename,
+            start: startTime,
+            end: endTime
+          })
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || "Trim failed");
+        lastTrimmedUrl = `${API}${data.url}`;
+        trimmedVideo.src = lastTrimmedUrl;
+        trimmedVideo.currentTime = 0;
+        trimmedVideo.play().catch(() => {});
+      } catch (err) {
+        alert("Server trim failed: " + err.message);
+        console.log("[trimmer]", "Server trim failed:", err.message);
+      }
+    });
+  }
 
   // --- Reset
-  if (resetBtn) resetBtn.addEventListener("click", () => {
-    startTime = 0;
-    endTime = videoDuration || 0;
-    syncHandlesToTimes();
-  });
+  if (resetBtn) {
+    resetBtn.addEventListener("click", () => {
+      startTime = 0;
+      endTime = videoDuration || 0;
+      syncHandlesToTimes();
+    });
+  }
 
-  // --- Download trimmed
-  if (downloadTrimBtn) downloadTrimBtn.addEventListener("click", async () => {
-    if (!lastTrimmedUrl) return alert("No trimmed file yet.");
-    const res = await fetch(lastTrimmedUrl);
-    const blob = await res.blob();
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "trimmed_video.mp4";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(a.href);
-  });
+  // --- Download
+  if (downloadTrimBtn) {
+    downloadTrimBtn.addEventListener("click", async () => {
+      if (!lastTrimmedUrl) return alert("No trimmed video available");
+      const res = await fetch(lastTrimmedUrl);
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "trimmed_video.mp4";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+  }
 
-  // --- Timeline click to seek
+  // --- Preview seek
   timelineWrap.addEventListener("click", e => {
     const rect = timelineWrap.getBoundingClientRect();
     const pct = (e.clientX - rect.left) / rect.width;
@@ -237,4 +243,12 @@ document.addEventListener("DOMContentLoaded", () => {
   window.addEventListener("resize", syncHandlesToTimes);
   const rafLoop = () => { updateMasks(); requestAnimationFrame(rafLoop); };
   requestAnimationFrame(rafLoop);
+
+  // --- Preview loaded metadata
+  preview.addEventListener("loadedmetadata", () => {
+    videoDuration = preview.duration || 0;
+    startTime = 0;
+    endTime = videoDuration;
+    syncHandlesToTimes();
+  });
 });
