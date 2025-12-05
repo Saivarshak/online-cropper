@@ -122,7 +122,7 @@ document.addEventListener("DOMContentLoaded", () => {
     updateBubbles();
   }
 
-  // --- Upload
+  // --- Upload (AUTO SCROLL ADDED)
   async function uploadFile(file) {
     if (!file) return;
     try {
@@ -132,8 +132,13 @@ document.addEventListener("DOMContentLoaded", () => {
       const res = await fetch(`${API}/upload`, { method: "POST", body: fd });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || "Upload failed");
+
       lastUploadedFilename = data.filename;
       setStatus("Upload complete");
+
+      // AUTO SCROLL ADDED HERE
+      autoScrollTo("preview");
+
     } catch (err) {
       alert("Upload failed: " + err.message);
       setStatus("Upload failed: " + err.message);
@@ -176,7 +181,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // --- Trim (UPDATED: JSON body)
+  // --- Trim
   if (trimBtn) {
     trimBtn.addEventListener("click", async () => {
       if (!lastUploadedFilename) return alert("Upload the file first!");
@@ -204,7 +209,6 @@ document.addEventListener("DOMContentLoaded", () => {
         trimmedVideo.play().catch(() => {});
       } catch (err) {
         alert("Server trim failed: " + err.message);
-        console.log("[trimmer]", "Server trim failed:", err.message);
       }
     });
   }
@@ -239,12 +243,12 @@ document.addEventListener("DOMContentLoaded", () => {
     preview.currentTime = pct * videoDuration;
   });
 
-  // --- Keep masks updated
+  // --- Masks update loop
   window.addEventListener("resize", syncHandlesToTimes);
   const rafLoop = () => { updateMasks(); requestAnimationFrame(rafLoop); };
   requestAnimationFrame(rafLoop);
 
-  // --- Preview loaded metadata
+  // --- Preview metadata
   preview.addEventListener("loadedmetadata", () => {
     videoDuration = preview.duration || 0;
     startTime = 0;
@@ -252,3 +256,17 @@ document.addEventListener("DOMContentLoaded", () => {
     syncHandlesToTimes();
   });
 });
+
+
+
+// --- Auto Scroll Function ---
+function autoScrollTo(elementId) {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+
+  const top = el.getBoundingClientRect().top + window.scrollY;
+  window.scrollTo({
+    top,
+    behavior: "smooth"
+  });
+}
