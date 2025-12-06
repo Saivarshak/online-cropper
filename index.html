@@ -5,6 +5,15 @@
 <!--<![endif]-->
 
 <head>
+     <script type="module">
+      import { FFmpeg } from "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg/dist/esm/ffmpeg.min.js";
+      import { fetchFile } from "https://cdn.jsdelivr.net/npm/@ffmpeg/util/dist/esm/fetchFile.min.js";
+
+      const ffmpeg = new FFmpeg();
+
+      await ffmpeg.load();
+      console.log("FFmpeg loaded!");
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.12/dist/ffmpeg.min.js"></script>
 
     <!-- Basic Page Needs -->
