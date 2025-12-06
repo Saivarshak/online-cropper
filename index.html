@@ -199,13 +199,13 @@
                         <h1 class="labeltext" for="comboInput">Enter Video URL</h1><br>
 
                         <!-- FIXED WIDTH (No more double scrollbar) -->
-                        <input type="text" id="loadBtn" for="labeltext"
-                               placeholder="Paste MP4 link" 
-                               style="width:100%;" />   
+                        
+                        <div class="input-row">
+            <input type="text" id="loadBtn" placeholder="Paste video URL" style="margin-bottom:50px" />
+            <button id="loadVideoBtn">Load Video</button>
+          </div>
 
-                        <br><br>
-
-                        <button id="loadVideoBtn" for="loadBtn" style="">Load Video</button>
+                      
                         <h5 style="color:white; margin-left:300px;">Or</h5>
                        <br>
                        <br>
@@ -256,18 +256,19 @@
                         
                         <!-- /banner -->
             <!-- trimmer -->
-            <div class="faqs-wrap" >
+          <div class="faqs-wrap">
             <div class="themesflat-container">
-                <!-- Add gap using g-3 (adjust number for bigger/smaller gap) -->
                 <div class="row g-7">
 
                 <!-- Video card -->
                 <div class="col-md-7 mb-5">
                     <div class="card">
-                    <!-- Input row (if needed for video upload/url) -->
-                    <div class="input-row">
-                        <div class="url-input" title="Paste a direct MP4/WEBM link here or use the upload button."></div>
-                    </div>
+                    <!-- File input (hidden) -->
+                    <input type="file" id="openFile" style="display:none;" accept="video/*">
+
+                    <!-- URL input and button -->
+                    
+
                     <video id="preview" controls playsinline style="width:100%;"></video>
                     </div>
                 </div>
@@ -299,17 +300,18 @@
 
                 <div class="col-md-12" id="scrool">
                     <div class="card">
-                    <!-- Input row (if needed for video upload/url) -->
                     <div class="input-row">
                         <div class="url-input" title="Paste a direct MP4/WEBM link here or use the upload button."></div>
                     </div>
-                        <video id="trimmedvideo" controls playsinline style="width:100%;"></video>
-                        <button id="downloadTrimBtn">Download Trimmed Video</button>
+                    <video id="trimmedvideo" controls playsinline style="width:100%;"></video>
+                    <button id="downloadTrimBtn">Download Trimmed Video</button>
                     </div>
                 </div>
+
                 </div>
             </div>
-            </div>
+        </div>
+
 
                         <!-- /trimmer -->
 

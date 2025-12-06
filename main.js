@@ -1,12 +1,10 @@
 document.addEventListener("DOMContentLoaded", () => {
 
   const API = "https://video-trimmer-backend.onrender.com";
-  data.url = "/trimmed/trim-xxxxx.mp4"
 
-
-  // =========================
+  // ============================================
   // ELEMENT REFERENCES
-  // =========================
+  // ============================================
   const preview = document.getElementById("preview");
   const trimmedVideo = document.getElementById("trimmedvideo");
   const timelineWrap = document.getElementById("timelineWrap");
@@ -17,21 +15,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const endBubble = document.getElementById("endBubble");
 
   const fileInput = document.getElementById("openFile");
-  const urlInput = document.getElementById("loadBtn");
-  const loadUrlBtn = document.getElementById("loadVideoBtn");
-
   const trimBtn = document.getElementById("trimBtn");
   const resetBtn = document.getElementById("resetBtn");
   const downloadTrimBtn = document.getElementById("downloadTrimBtn");
 
-  if (!preview || !timelineWrap || !startHandle || !endHandle) {
-    console.error("Required elements missing in HTML!");
-    return;
-  }
-
-  // =========================
+  // ============================================
   // INTERNAL STATE
-  // =========================
+  // ============================================
   let videoDuration = 0;
   let startTime = 0;
   let endTime = 0;
@@ -40,13 +30,12 @@ document.addEventListener("DOMContentLoaded", () => {
   let lastTrimmedUrl = null;
 
   const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
-  const fmt = sec => `${String(Math.floor(sec / 60)).padStart(2, "0")}:${String(Math.floor(sec % 60)).padStart(2, "0")}`;
+  const fmt = sec => 
+    `${String(Math.floor(sec / 60)).padStart(2, "0")}:${String(Math.floor(sec % 60)).padStart(2, "0")}`;
 
-  const setStatus = msg => console.log("[trimmer] " + msg);
-
-  // =========================
-  // MASK OVERLAYS
-  // =========================
+  // ============================================
+  // OVERLAY MASKS
+  // ============================================
   const leftMask = document.createElement("div");
   const rightMask = document.createElement("div");
   const selectionOverlay = document.createElement("div");
@@ -68,19 +57,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
   timelineWrap.append(leftMask, rightMask, selectionOverlay);
 
-  // =========================
-  // UPDATE UI HELPERS
-  // =========================
+  // ============================================
+  // UI HELPERS
+  // ============================================
   function updateBubbles() {
-    if (startBubble) startBubble.textContent = fmt(startTime);
-    if (endBubble) endBubble.textContent = fmt(endTime);
+    startBubble.textContent = fmt(startTime);
+    endBubble.textContent = fmt(endTime);
 
-    if (startBubble && startHandle) {
-      startBubble.style.left = (parseFloat(startHandle.style.left) + 4) + "px";
-    }
-    if (endBubble && endHandle) {
-      endBubble.style.left = (parseFloat(endHandle.style.left) - 40) + "px";
-    }
+    startBubble.style.left = parseFloat(startHandle.style.left) + "px";
+    endBubble.style.left = (parseFloat(endHandle.style.left) - 40) + "px";
   }
 
   function updateMasks() {
@@ -106,18 +91,18 @@ document.addEventListener("DOMContentLoaded", () => {
     updateBubbles();
   }
 
-  // =========================
-  // DRAGGING SYSTEM
-  // =========================
+  // ============================================
+  // DRAGGING HANDLES
+  // ============================================
   function makeDraggable(handle, isStart) {
     handle.style.position = "absolute";
 
-    const startDrag = (clientX) => {
+    const startDrag = clientX => {
       const rect = timelineWrap.getBoundingClientRect();
-      const initialLeft = parseFloat(handle.style.left) || 0;
-      const offset = clientX - (rect.left + initialLeft);
+      const initial = parseFloat(handle.style.left) || 0;
+      const offset = clientX - (rect.left + initial);
 
-      const onMove = (clientXMove) => {
+      const onMove = clientXMove => {
         const r = timelineWrap.getBoundingClientRect();
         let x = clamp(clientXMove - r.left - offset, 0, r.width);
 
@@ -159,9 +144,9 @@ document.addEventListener("DOMContentLoaded", () => {
   makeDraggable(startHandle, true);
   makeDraggable(endHandle, false);
 
-  // =========================
+  // ============================================
   // THUMBNAILS
-  // =========================
+  // ============================================
   function captureFrameAt(videoEl, time, width = 60, height = 40) {
     return new Promise(resolve => {
       const canvas = document.createElement("canvas");
@@ -170,16 +155,18 @@ document.addEventListener("DOMContentLoaded", () => {
       const ctx = canvas.getContext("2d");
 
       videoEl.currentTime = time;
-      videoEl.addEventListener("seeked", () => {
-        ctx.drawImage(videoEl, 0, 0, width, height);
-        resolve(canvas.toDataURL("image/jpeg"));
-      }, { once: true });
+      videoEl.addEventListener(
+        "seeked",
+        () => {
+          ctx.drawImage(videoEl, 0, 0, width, height);
+          resolve(canvas.toDataURL("image/jpeg"));
+        },
+        { once: true }
+      );
     });
   }
 
   async function renderThumbnails() {
-    if (!thumbStrip) return;
-
     thumbStrip.innerHTML = "";
     if (!videoDuration || endTime <= startTime) return;
 
@@ -199,24 +186,13 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // =========================
-  // AUTO-SCROLL
-  // =========================
-  function autoScrollTo(id) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    const top = el.getBoundingClientRect().top + window.scrollY;
-    window.scrollTo({ top, behavior: "smooth" });
-  }
-
-  // =========================
+  // ============================================
   // FILE UPLOAD
-  // =========================
+  // ============================================
   async function uploadFile(file) {
     if (!file) return;
 
     try {
-      setStatus("Uploading...");
       const fd = new FormData();
       fd.append("video", file);
 
@@ -229,63 +205,31 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!data.success) throw new Error(data.error || "Upload failed");
 
       lastUploadedFilename = data.filename;
-      setStatus("Upload complete");
     } catch (err) {
       alert("Upload failed: " + err.message);
     }
   }
 
-  // When user selects local file
-  if (fileInput) {
-    fileInput.addEventListener("change", e => {
-      const f = e.target.files[0];
-      if (!f) return;
+  // File picker
+  fileInput.addEventListener("change", e => {
+    const f = e.target.files[0];
+    if (!f) return;
 
-      currentFileObject = f;
-      preview.src = URL.createObjectURL(f);
-      preview.load();
+    currentFileObject = f;
 
-      preview.addEventListener("loadedmetadata", () => autoScrollTo("preview"), { once: true });
+    preview.src = URL.createObjectURL(f);
+    preview.load();
 
-      uploadFile(f);
-    });
+    uploadFile(f);
+  });
 
-    // Preview click opens file picker
-    preview.style.cursor = "pointer";
-    preview.addEventListener("click", () => fileInput.click());
-  }
+  // Click preview to open file
+  preview.style.cursor = "pointer";
+  preview.addEventListener("click", () => fileInput.click());
 
-  // =========================
-  // LOAD VIDEO FROM URL
-  // =========================
-  if (loadUrlBtn) {
-    loadUrlBtn.addEventListener("click", async () => {
-      const url = urlInput.value.trim();
-      if (!url) return alert("Paste a video URL");
-
-      try {
-        const res = await fetch(url);
-        const blob = await res.blob();
-        const file = new File([blob], "remote.mp4", { type: blob.type || "video/mp4" });
-
-        currentFileObject = file;
-        preview.src = URL.createObjectURL(file);
-        preview.load();
-
-        preview.addEventListener("loadedmetadata", () => autoScrollTo("scrool"), { once: true });
-
-        uploadFile(file);
-      } catch {
-        preview.src = url;
-        currentFileObject = null;
-        alert("CORS may block server trimming for remote URL");
-      }
-    });
-  }
-
-  // =========================
+  // ============================================
   // TRIM VIDEO
-  // =========================
+  // ============================================
   trimBtn.addEventListener("click", async () => {
     if (!lastUploadedFilename) return alert("Upload a video first.");
 
@@ -312,17 +256,20 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!data.success) throw new Error(data.error || "Trim failed");
 
       lastTrimmedUrl = `${API}${data.url}`;
+
+      // Load trimmed video
       trimmedVideo.src = lastTrimmedUrl;
       trimmedVideo.currentTime = 0;
+
       trimmedVideo.play().catch(() => {});
     } catch (err) {
       alert("Trim failed: " + err.message);
     }
   });
 
-  // =========================
-  // RESET RANGE
-  // =========================
+  // ============================================
+  // RESET
+  // ============================================
   resetBtn.addEventListener("click", () => {
     startTime = 0;
     endTime = videoDuration;
@@ -330,11 +277,11 @@ document.addEventListener("DOMContentLoaded", () => {
     renderThumbnails();
   });
 
-  // =========================
+  // ============================================
   // DOWNLOAD TRIMMED
-  // =========================
+  // ============================================
   downloadTrimBtn.addEventListener("click", async () => {
-    if (!lastTrimmedUrl) return alert("Trim the video first.");
+    if (!lastTrimmedUrl) return alert("Trim first.");
 
     const r = await fetch(lastTrimmedUrl);
     const blob = await r.blob();
@@ -345,9 +292,9 @@ document.addEventListener("DOMContentLoaded", () => {
     URL.revokeObjectURL(a.href);
   });
 
-  // =========================
-  // WHEN VIDEO METADATA LOADS
-  // =========================
+  // ============================================
+  // VIDEO LOADED
+  // ============================================
   preview.addEventListener("loadedmetadata", () => {
     videoDuration = preview.duration;
     startTime = 0;
@@ -356,6 +303,75 @@ document.addEventListener("DOMContentLoaded", () => {
     syncHandlesToTimes();
     renderThumbnails();
   });
-
 });
+
+  // ============================================
+  // SERVER TRIM → PREVIEW BLOB VIDEO
+  // ============================================
+
+  // Replace existing trim logic below with this block if needed
+  trimBtn.addEventListener("click", async () => {
+    if (!currentFileObject) {
+      alert("Please upload a video first.");
+      return;
+    }
+
+    const rect = timelineWrap.getBoundingClientRect();
+    const width = rect.width;
+
+    // Calculate trim times
+    startTime = (parseFloat(startHandle.style.left) / width) * videoDuration;
+    endTime = (parseFloat(endHandle.style.left) / width) * videoDuration;
+
+    if (startTime >= endTime) {
+      alert("Invalid selection range.");
+      return;
+    }
+
+    try {
+      const form = new FormData();
+      form.append("video", currentFileObject);
+      form.append("start", startTime);
+      form.append("end", endTime);
+
+      const res = await fetch(`${API}/trim`, {
+        method: "POST",
+        body: form
+      });
+
+      if (!res.ok) {
+        alert("Trim failed. Check backend.");
+        return;
+      }
+
+      // Blob from server
+      const blob = await res.blob();
+
+      // Local preview file
+      const url = URL.createObjectURL(blob);
+
+      trimmedVideo.src = url;
+      trimmedVideo.currentTime = 0;
+      trimmedVideo.play().catch(() => {});
+
+      lastTrimmedUrl = url; // store for download
+    } catch (err) {
+      alert("Trim failed: " + err.message);
+    }
+  });
+
+  // ============================================
+  // DOWNLOADING TRIM RESULT
+  // ============================================
+  downloadTrimBtn.addEventListener("click", () => {
+    if (!lastTrimmedUrl) {
+      alert("Trim a video first.");
+      return;
+    }
+
+    const a = document.createElement("a");
+    a.href = lastTrimmedUrl;
+    a.download = "trimmed_video.mp4";
+    a.click();
+  });
 
