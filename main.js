@@ -1,93 +1,125 @@
-const express = require("express");
-const multer = require("multer");
-const cors = require("cors");
-const { exec } = require("child_process");
-const ffmpegPath = require("ffmpeg-static");
-const path = require("path");
-const fs = require("fs");
+document.addEventListener("DOMContentLoaded", () => {
+  const API = "https://video-trimmer-backend.onrender.com";
 
-const app = express();
+  // =========================
+  // ELEMENT REFERENCES
+  // =========================
+  const preview = document.getElementById("preview");
+  const trimmedVideo = document.getElementById("trimmedvideo");
+  const fileInput = document.getElementById("upload");
+  const startRange = document.getElementById("startRange");
+  const endRange = document.getElementById("endRange");
+  const trimBtn = document.getElementById("trimBtn");
+  const timelineWrap = document.getElementById("timelineWrap");
+  const thumbStrip = document.getElementById("thumbStrip");
 
-// Allow cross-origin
-app.use(cors());
-app.use(express.json());
+  let selectedFile = null;
 
-// Ensure folders exist
-if (!fs.existsSync("uploads")) fs.mkdirSync("uploads");
-if (!fs.existsSync("trimmed")) fs.mkdirSync("trimmed");
+  // =========================
+  // LOAD VIDEO PREVIEW
+  // =========================
+  fileInput.addEventListener("change", e => {
+    const file = e.target.files[0];
+    if (!file) return;
 
-// Serve trimmed files
-app.use("/trimmed", express.static(path.join(__dirname, "trimmed")));
+    selectedFile = file;
 
-// Health check
-app.get("/", (req, res) => {
-  res.send("Video Trimmer Backend Running");
-});
+    const url = URL.createObjectURL(file);
+    preview.src = url;
 
-// Configure Multer
-const storage = multer.diskStorage({
-  destination: "uploads",
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + ".mp4");
-  }
-});
+    preview.addEventListener("loadedmetadata", () => {
+      startRange.max = preview.duration;
+      endRange.max = preview.duration;
+      endRange.value = preview.duration;
 
-const upload = multer({ storage });
-
-/* ======================================================
-   1) UPLOAD API 
-   Sends file -> returns filename
-====================================================== */
-app.post("/upload", upload.single("video"), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ success: false, error: "No file uploaded" });
-  }
-
-  res.json({
-    success: true,
-    filename: req.file.filename
+      generateThumbs(file);
+    });
   });
-});
 
-/* ======================================================
-   2) TRIM API  
-   Frontend sends:
-   - video: <file>
-   - start: seconds
-   - end: seconds
-====================================================== */
-app.post("/trim", upload.single("video"), (req, res) => {
-  const { start, end } = req.body;
+  // =========================
+  // GENERATE TIMELINE THUMBNAILS
+  // =========================
+  function generateThumbs(file) {
+    thumbStrip.innerHTML = "";
+    const video = document.createElement("video");
+    video.src = URL.createObjectURL(file);
 
-  // Must receive a file
-  if (!req.file) {
-    return res.status(400).json({ success: false, error: "No video provided for trimming" });
+    video.addEventListener("loadedmetadata", () => {
+      const duration = video.duration;
+      const interval = duration / 8;
+
+      let current = 0;
+
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+
+      const generate = () => {
+        if (current > duration) return;
+        video.currentTime = current;
+      };
+
+      video.addEventListener("seeked", () => {
+        canvas.width = 120;
+        canvas.height = 70;
+
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        const img = document.createElement("img");
+        img.src = canvas.toDataURL();
+        img.className = "thumb";
+        thumbStrip.appendChild(img);
+
+        current += interval;
+        generate();
+      });
+
+      generate();
+    });
   }
 
-  // Ensure time values exist
-  if (start === undefined || end === undefined) {
-    return res.status(400).json({ success: false, error: "Missing start or end time" });
-  }
-
-  const inputPath = path.join(__dirname, "uploads", req.file.filename);
-  const outputName = "trim-" + Date.now() + ".mp4";
-  const outputPath = path.join(__dirname, "trimmed", outputName);
-
-  // Build ffmpeg trim command
-  const command = `"${ffmpegPath}" -i "${inputPath}" -ss ${start} -to ${end} -c copy "${outputPath}"`;
-
-  exec(command, err => {
-    if (err) {
-      return res.status(500).json({ success: false, error: err.message });
+  // =========================
+  // TRIM VIDEO
+  // =========================
+  trimBtn.addEventListener("click", async () => {
+    if (!selectedFile) {
+      alert("Upload a video first");
+      return;
     }
 
-    // Frontend uses blob(), so send the file directly
-    res.sendFile(outputPath);
-  });
-});
+    const start = parseFloat(startRange.value);
+    const end = parseFloat(endRange.value);
 
-// Start server
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Backend running on port ${PORT}`);
+    if (start >= end) {
+      alert("Start time must be less than end time");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("video", selectedFile);
+    formData.append("start", start);
+    formData.append("end", end);
+
+    try {
+      const res = await fetch(`${API}/trim`, {
+        method: "POST",
+        body: formData
+      });
+
+      if (!res.ok) {
+        alert("Trimming failed");
+        return;
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+
+      trimmedVideo.src = url;
+      trimmedVideo.load();
+      trimmedVideo.style.display = "block";
+
+    } catch (err) {
+      console.error(err);
+      alert("Error occurred while trimming");
+    }
+  });
 });
