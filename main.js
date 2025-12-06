@@ -1,6 +1,8 @@
 document.addEventListener("DOMContentLoaded", () => {
 
   const API = "https://video-trimmer-backend.onrender.com";
+  data.url = "/trimmed/trim-xxxxx.mp4"
+
 
   // =========================
   // ELEMENT REFERENCES
@@ -270,7 +272,7 @@ document.addEventListener("DOMContentLoaded", () => {
         preview.src = URL.createObjectURL(file);
         preview.load();
 
-        preview.addEventListener("loadedmetadata", () => autoScrollTo("preview"), { once: true });
+        preview.addEventListener("loadedmetadata", () => autoScrollTo("scrool"), { once: true });
 
         uploadFile(file);
       } catch {
@@ -356,5 +358,4 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
 });
-
 
