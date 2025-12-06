@@ -1,291 +1,93 @@
-document.addEventListener("DOMContentLoaded", () => {
+const express = require("express");
+const multer = require("multer");
+const cors = require("cors");
+const { exec } = require("child_process");
+const ffmpegPath = require("ffmpeg-static");
+const path = require("path");
+const fs = require("fs");
 
-  const API = "https://video-trimmer-backend.onrender.com";
+const app = express();
 
-  // ELEMENT REFERENCES
-  const preview = document.getElementById("preview");
-  const trimmedVideo = document.getElementById("trimmedvideo");
-  const timelineWrap = document.getElementById("timelineWrap");
-  const thumbStrip = document.getElementById("thumbStrip");
-  const startHandle = document.getElementById("startHandle");
-  const endHandle = document.getElementById("endHandle");
-  const startBubble = document.getElementById("startBubble");
-  const endBubble = document.getElementById("endBubble");
+// Allow cross-origin
+app.use(cors());
+app.use(express.json());
 
-  const fileInput = document.getElementById("openFile");
-  const trimBtn = document.getElementById("trimBtn");
-  const resetBtn = document.getElementById("resetBtn");
-  const downloadTrimBtn = document.getElementById("downloadTrimBtn");
+// Ensure folders exist
+if (!fs.existsSync("uploads")) fs.mkdirSync("uploads");
+if (!fs.existsSync("trimmed")) fs.mkdirSync("trimmed");
 
-  // INTERNAL
-  let videoDuration = 0;
-  let startTime = 0;
-  let endTime = 0;
-  let currentFileObject = null;
-  let lastUploadedFilename = null;
-  let lastTrimmedUrl = null;
+// Serve trimmed files
+app.use("/trimmed", express.static(path.join(__dirname, "trimmed")));
 
-  const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
-  const fmt = sec =>
-    `${String(Math.floor(sec / 60)).padStart(2, "0")}:${String(Math.floor(sec % 60)).padStart(2, "0")}`;
+// Health check
+app.get("/", (req, res) => {
+  res.send("Video Trimmer Backend Running");
+});
 
-  // OVERLAY MASKS
-  const leftMask = document.createElement("div");
-  const rightMask = document.createElement("div");
-  const selectionOverlay = document.createElement("div");
+// Configure Multer
+const storage = multer.diskStorage({
+  destination: "uploads",
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + ".mp4");
+  }
+});
 
-  [leftMask, rightMask, selectionOverlay].forEach(el => {
-    el.style.position = "absolute";
-    el.style.top = "0";
-    el.style.bottom = "0";
-    el.style.pointerEvents = "none";
+const upload = multer({ storage });
+
+/* ======================================================
+   1) UPLOAD API 
+   Sends file -> returns filename
+====================================================== */
+app.post("/upload", upload.single("video"), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ success: false, error: "No file uploaded" });
+  }
+
+  res.json({
+    success: true,
+    filename: req.file.filename
   });
+});
 
-  leftMask.style.background = rightMask.style.background = "rgba(0,0,0,0.65)";
-  selectionOverlay.style.border = "4px solid rgba(0,123,255,0.95)";
-  selectionOverlay.style.borderRadius = "10px";
+/* ======================================================
+   2) TRIM API  
+   Frontend sends:
+   - video: <file>
+   - start: seconds
+   - end: seconds
+====================================================== */
+app.post("/trim", upload.single("video"), (req, res) => {
+  const { start, end } = req.body;
 
-  if (getComputedStyle(timelineWrap).position === "static") {
-    timelineWrap.style.position = "relative";
+  // Must receive a file
+  if (!req.file) {
+    return res.status(400).json({ success: false, error: "No video provided for trimming" });
   }
 
-  timelineWrap.append(leftMask, rightMask, selectionOverlay);
-
-  // UI BUBBLES
-  function updateBubbles() {
-    startBubble.textContent = fmt(startTime);
-    endBubble.textContent = fmt(endTime);
-
-    startBubble.style.left = parseFloat(startHandle.style.left) + "px";
-    endBubble.style.left = (parseFloat(endHandle.style.left) - 40) + "px";
+  // Ensure time values exist
+  if (start === undefined || end === undefined) {
+    return res.status(400).json({ success: false, error: "Missing start or end time" });
   }
 
-  function updateMasks() {
-    const w = timelineWrap.clientWidth;
-    const s = clamp(parseFloat(startHandle.style.left) || 0, 0, w);
-    const e = clamp(parseFloat(endHandle.style.left) || w, 0, w);
+  const inputPath = path.join(__dirname, "uploads", req.file.filename);
+  const outputName = "trim-" + Date.now() + ".mp4";
+  const outputPath = path.join(__dirname, "trimmed", outputName);
 
-    leftMask.style.width = s + "px";
-    rightMask.style.left = e + "px";
-    rightMask.style.width = (w - e) + "px";
+  // Build ffmpeg trim command
+  const command = `"${ffmpegPath}" -i "${inputPath}" -ss ${start} -to ${end} -c copy "${outputPath}"`;
 
-    selectionOverlay.style.left = s + "px";
-    selectionOverlay.style.width = (e - s) + "px";
-  }
-
-  function syncHandlesToTimes() {
-    const w = timelineWrap.clientWidth;
-
-    startHandle.style.left = (startTime / videoDuration) * w + "px";
-    endHandle.style.left = (endTime / videoDuration) * w + "px";
-
-    updateMasks();
-    updateBubbles();
-  }
-
-  // DRAGGING
-  function makeDraggable(handle, isStart) {
-    handle.style.position = "absolute";
-
-    const startDrag = clientX => {
-      const rect = timelineWrap.getBoundingClientRect();
-      const init = parseFloat(handle.style.left) || 0;
-      const offset = clientX - (rect.left + init);
-
-      const onMove = clientXMove => {
-        const r = timelineWrap.getBoundingClientRect();
-        let x = clamp(clientXMove - r.left - offset, 0, r.width);
-
-        if (isStart) {
-          x = Math.min(x, parseFloat(endHandle.style.left) || r.width);
-          startHandle.style.left = x + "px";
-          startTime = (x / r.width) * videoDuration;
-        } else {
-          x = Math.max(x, parseFloat(startHandle.style.left) || 0);
-          endHandle.style.left = x + "px";
-          endTime = (x / r.width) * videoDuration;
-        }
-
-        updateMasks();
-        updateBubbles();
-        renderThumbnails();
-      };
-
-      const onMouseMove = e => onMove(e.clientX);
-      const onTouchMove = e => onMove(e.touches[0].clientX);
-
-      const stop = () => {
-        document.removeEventListener("mousemove", onMouseMove);
-        document.removeEventListener("mouseup", stop);
-        document.removeEventListener("touchmove", onTouchMove);
-        document.removeEventListener("touchend", stop);
-      };
-
-      document.addEventListener("mousemove", onMouseMove);
-      document.addEventListener("mouseup", stop);
-      document.addEventListener("touchmove", onTouchMove);
-      document.addEventListener("touchend", stop);
-    };
-
-    handle.addEventListener("mousedown", e => startDrag(e.clientX));
-    handle.addEventListener("touchstart", e => startDrag(e.touches[0].clientX), { passive: true });
-  }
-
-  makeDraggable(startHandle, true);
-  makeDraggable(endHandle, false);
-
-  // THUMBNAILS
-  function captureFrameAt(videoEl, time, width = 60, height = 40) {
-    return new Promise(resolve => {
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext("2d");
-
-      videoEl.currentTime = time;
-      videoEl.addEventListener(
-        "seeked",
-        () => {
-          ctx.drawImage(videoEl, 0, 0, width, height);
-          resolve(canvas.toDataURL("image/jpeg"));
-        },
-        { once: true }
-      );
-    });
-  }
-
-  async function renderThumbnails() {
-    thumbStrip.innerHTML = "";
-    if (!videoDuration || endTime <= startTime) return;
-
-    const count = 12;
-    const segment = (endTime - startTime) / count;
-
-    for (let i = 0; i < count; i++) {
-      const t = startTime + segment * i;
-      const dataURL = await captureFrameAt(preview, t);
-
-      const img = document.createElement("img");
-      img.src = dataURL;
-      img.style.width = "60px";
-      img.style.height = "40px";
-
-      thumbStrip.appendChild(img);
-    }
-  }
-
-  // UPLOAD
-  async function uploadFile(file) {
-    if (!file) return;
-
-    try {
-      const fd = new FormData();
-      fd.append("video", file);
-
-      const res = await fetch(`${API}/upload`, {
-        method: "POST",
-        body: fd
-      });
-
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error || "Upload failed");
-
-      lastUploadedFilename = data.filename;
-    } catch (err) {
-      alert("Upload failed: " + err.message);
-    }
-  }
-
-  fileInput.addEventListener("change", e => {
-    const f = e.target.files[0];
-    if (!f) return;
-
-    currentFileObject = f;
-
-    preview.src = URL.createObjectURL(f);
-    preview.load();
-
-    uploadFile(f);
-  });
-
-  preview.style.cursor = "pointer";
-  preview.addEventListener("click", () => fileInput.click());
-
-  // TRIM BUTTON (single correct version)
-  trimBtn.addEventListener("click", async () => {
-    if (!currentFileObject) {
-      alert("Please upload a video first.");
-      return;
+  exec(command, err => {
+    if (err) {
+      return res.status(500).json({ success: false, error: err.message });
     }
 
-    const rect = timelineWrap.getBoundingClientRect();
-    const width = rect.width;
-
-    startTime = (parseFloat(startHandle.style.left) / width) * videoDuration;
-    endTime = (parseFloat(endHandle.style.left) / width) * videoDuration;
-
-    if (startTime >= endTime) {
-      alert("Invalid selection range.");
-      return;
-    }
-
-    try {
-      const form = new FormData();
-      form.append("video", currentFileObject);
-      form.append("start", startTime);
-      form.append("end", endTime);
-
-      const res = await fetch(`${API}/trim`, {
-        method: "POST",
-        body: form
-      });
-
-      if (!res.ok) {
-        alert("Trim failed. Check backend.");
-        return;
-      }
-
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-
-      trimmedVideo.src = url;
-      trimmedVideo.currentTime = 0;
-      trimmedVideo.play().catch(() => {});
-
-      lastTrimmedUrl = url;
-    } catch (err) {
-      alert("Trim failed: " + err.message);
-    }
+    // Frontend uses blob(), so send the file directly
+    res.sendFile(outputPath);
   });
+});
 
-  // RESET
-  resetBtn.addEventListener("click", () => {
-    startTime = 0;
-    endTime = videoDuration;
-    syncHandlesToTimes();
-    renderThumbnails();
-  });
-
-  // DOWNLOAD
-  downloadTrimBtn.addEventListener("click", () => {
-    if (!lastTrimmedUrl) {
-      alert("Trim a video first.");
-      return;
-    }
-
-    const a = document.createElement("a");
-    a.href = lastTrimmedUrl;
-    a.download = "trimmed_video.mp4";
-    a.click();
-  });
-
-  // WHEN VIDEO LOADS
-  preview.addEventListener("loadedmetadata", () => {
-    videoDuration = preview.duration;
-    startTime = 0;
-    endTime = videoDuration;
-
-    syncHandlesToTimes();
-    renderThumbnails();
-  });
+// Start server
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`Backend running on port ${PORT}`);
 });
