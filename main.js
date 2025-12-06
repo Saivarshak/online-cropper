@@ -2,9 +2,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const API = "https://video-trimmer-backend.onrender.com";
 
-  // ============================================
   // ELEMENT REFERENCES
-  // ============================================
   const preview = document.getElementById("preview");
   const trimmedVideo = document.getElementById("trimmedvideo");
   const timelineWrap = document.getElementById("timelineWrap");
@@ -19,9 +17,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const resetBtn = document.getElementById("resetBtn");
   const downloadTrimBtn = document.getElementById("downloadTrimBtn");
 
-  // ============================================
-  // INTERNAL STATE
-  // ============================================
+  // INTERNAL
   let videoDuration = 0;
   let startTime = 0;
   let endTime = 0;
@@ -30,12 +26,10 @@ document.addEventListener("DOMContentLoaded", () => {
   let lastTrimmedUrl = null;
 
   const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
-  const fmt = sec => 
+  const fmt = sec =>
     `${String(Math.floor(sec / 60)).padStart(2, "0")}:${String(Math.floor(sec % 60)).padStart(2, "0")}`;
 
-  // ============================================
   // OVERLAY MASKS
-  // ============================================
   const leftMask = document.createElement("div");
   const rightMask = document.createElement("div");
   const selectionOverlay = document.createElement("div");
@@ -57,9 +51,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   timelineWrap.append(leftMask, rightMask, selectionOverlay);
 
-  // ============================================
-  // UI HELPERS
-  // ============================================
+  // UI BUBBLES
   function updateBubbles() {
     startBubble.textContent = fmt(startTime);
     endBubble.textContent = fmt(endTime);
@@ -91,16 +83,14 @@ document.addEventListener("DOMContentLoaded", () => {
     updateBubbles();
   }
 
-  // ============================================
-  // DRAGGING HANDLES
-  // ============================================
+  // DRAGGING
   function makeDraggable(handle, isStart) {
     handle.style.position = "absolute";
 
     const startDrag = clientX => {
       const rect = timelineWrap.getBoundingClientRect();
-      const initial = parseFloat(handle.style.left) || 0;
-      const offset = clientX - (rect.left + initial);
+      const init = parseFloat(handle.style.left) || 0;
+      const offset = clientX - (rect.left + init);
 
       const onMove = clientXMove => {
         const r = timelineWrap.getBoundingClientRect();
@@ -121,19 +111,19 @@ document.addEventListener("DOMContentLoaded", () => {
         renderThumbnails();
       };
 
-      const mouseMove = e => onMove(e.clientX);
-      const touchMove = e => onMove(e.touches[0].clientX);
+      const onMouseMove = e => onMove(e.clientX);
+      const onTouchMove = e => onMove(e.touches[0].clientX);
 
       const stop = () => {
-        document.removeEventListener("mousemove", mouseMove);
+        document.removeEventListener("mousemove", onMouseMove);
         document.removeEventListener("mouseup", stop);
-        document.removeEventListener("touchmove", touchMove);
+        document.removeEventListener("touchmove", onTouchMove);
         document.removeEventListener("touchend", stop);
       };
 
-      document.addEventListener("mousemove", mouseMove);
+      document.addEventListener("mousemove", onMouseMove);
       document.addEventListener("mouseup", stop);
-      document.addEventListener("touchmove", touchMove);
+      document.addEventListener("touchmove", onTouchMove);
       document.addEventListener("touchend", stop);
     };
 
@@ -144,9 +134,7 @@ document.addEventListener("DOMContentLoaded", () => {
   makeDraggable(startHandle, true);
   makeDraggable(endHandle, false);
 
-  // ============================================
   // THUMBNAILS
-  // ============================================
   function captureFrameAt(videoEl, time, width = 60, height = 40) {
     return new Promise(resolve => {
       const canvas = document.createElement("canvas");
@@ -186,9 +174,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // ============================================
-  // FILE UPLOAD
-  // ============================================
+  // UPLOAD
   async function uploadFile(file) {
     if (!file) return;
 
@@ -210,7 +196,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // File picker
   fileInput.addEventListener("change", e => {
     const f = e.target.files[0];
     if (!f) return;
@@ -223,93 +208,10 @@ document.addEventListener("DOMContentLoaded", () => {
     uploadFile(f);
   });
 
-  // Click preview to open file
   preview.style.cursor = "pointer";
   preview.addEventListener("click", () => fileInput.click());
 
-  // ============================================
-  // TRIM VIDEO
-  // ============================================
-  trimBtn.addEventListener("click", async () => {
-    if (!lastUploadedFilename) return alert("Upload a video first.");
-
-    const rect = timelineWrap.getBoundingClientRect();
-    const width = rect.width;
-
-    startTime = (parseFloat(startHandle.style.left) / width) * videoDuration;
-    endTime = (parseFloat(endHandle.style.left) / width) * videoDuration;
-
-    if (startTime >= endTime) return alert("Invalid trim range");
-
-    try {
-      const res = await fetch(`${API}/trim`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          filename: lastUploadedFilename,
-          start: startTime,
-          end: endTime
-        })
-      });
-
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error || "Trim failed");
-
-      lastTrimmedUrl = `${API}${data.url}`;
-
-      // Load trimmed video
-      trimmedVideo.src = lastTrimmedUrl;
-      trimmedVideo.currentTime = 0;
-
-      trimmedVideo.play().catch(() => {});
-    } catch (err) {
-      alert("Trim failed: " + err.message);
-    }
-  });
-
-  // ============================================
-  // RESET
-  // ============================================
-  resetBtn.addEventListener("click", () => {
-    startTime = 0;
-    endTime = videoDuration;
-    syncHandlesToTimes();
-    renderThumbnails();
-  });
-
-  // ============================================
-  // DOWNLOAD TRIMMED
-  // ============================================
-  downloadTrimBtn.addEventListener("click", async () => {
-    if (!lastTrimmedUrl) return alert("Trim first.");
-
-    const r = await fetch(lastTrimmedUrl);
-    const blob = await r.blob();
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "trimmed_video.mp4";
-    a.click();
-    URL.revokeObjectURL(a.href);
-  });
-
-  // ============================================
-  // VIDEO LOADED
-  // ============================================
-  preview.addEventListener("loadedmetadata", () => {
-    videoDuration = preview.duration;
-    startTime = 0;
-    endTime = videoDuration;
-
-    syncHandlesToTimes();
-    renderThumbnails();
-  });
-});
-
-  // ============================================
-  // SERVER TRIM → PREVIEW BLOB VIDEO
-  // ============================================
-
-  // Replace existing trim logic below with this block if needed
+  // TRIM BUTTON (single correct version)
   trimBtn.addEventListener("click", async () => {
     if (!currentFileObject) {
       alert("Please upload a video first.");
@@ -319,7 +221,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const rect = timelineWrap.getBoundingClientRect();
     const width = rect.width;
 
-    // Calculate trim times
     startTime = (parseFloat(startHandle.style.left) / width) * videoDuration;
     endTime = (parseFloat(endHandle.style.left) / width) * videoDuration;
 
@@ -344,25 +245,28 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      // Blob from server
       const blob = await res.blob();
-
-      // Local preview file
       const url = URL.createObjectURL(blob);
 
       trimmedVideo.src = url;
       trimmedVideo.currentTime = 0;
       trimmedVideo.play().catch(() => {});
 
-      lastTrimmedUrl = url; // store for download
+      lastTrimmedUrl = url;
     } catch (err) {
       alert("Trim failed: " + err.message);
     }
   });
 
-  // ============================================
-  // DOWNLOADING TRIM RESULT
-  // ============================================
+  // RESET
+  resetBtn.addEventListener("click", () => {
+    startTime = 0;
+    endTime = videoDuration;
+    syncHandlesToTimes();
+    renderThumbnails();
+  });
+
+  // DOWNLOAD
   downloadTrimBtn.addEventListener("click", () => {
     if (!lastTrimmedUrl) {
       alert("Trim a video first.");
@@ -375,3 +279,13 @@ document.addEventListener("DOMContentLoaded", () => {
     a.click();
   });
 
+  // WHEN VIDEO LOADS
+  preview.addEventListener("loadedmetadata", () => {
+    videoDuration = preview.duration;
+    startTime = 0;
+    endTime = videoDuration;
+
+    syncHandlesToTimes();
+    renderThumbnails();
+  });
+});
