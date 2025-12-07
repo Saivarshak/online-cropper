@@ -1,10 +1,10 @@
-import { createFFmpeg, fetchFile } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.3/dist/ffmpeg.min.js';
+import { FFmpeg } from "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.6/dist/esm/index.js";
+import { fetchFile } from "https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.6/dist/esm/index.js";
 
-const ffmpeg = createFFmpeg({ log: true });
+const ffmpeg = new FFmpeg();
 
-(async () => {
-  await ffmpeg.load();
-  console.log("FFmpeg loaded!");
+await ffmpeg.load();
+console.log("FFmpeg loaded!");
 
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -132,5 +132,3 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 });
-
-})();
