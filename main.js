@@ -1,3 +1,12 @@
+import { createFFmpeg, fetchFile } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.3/dist/ffmpeg.min.js';
+
+const ffmpeg = createFFmpeg({ log: true });
+
+(async () => {
+  await ffmpeg.load();
+  console.log("FFmpeg loaded!");
+
+
 document.addEventListener("DOMContentLoaded", () => {
   const API = "https://video-trimmer-backend.onrender.com";
 
@@ -123,3 +132,5 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 });
+
+})();
