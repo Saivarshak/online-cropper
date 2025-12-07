@@ -1,40 +1,26 @@
-import { FFmpeg } from "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.6/dist/esm/index.js";
-import { fetchFile } from "https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.6/dist/esm/index.js";
-
-const ffmpeg = new FFmpeg();
-
-await ffmpeg.load();
-console.log("FFmpeg loaded!");
-
-
 document.addEventListener("DOMContentLoaded", () => {
   const API = "https://video-trimmer-backend.onrender.com";
 
-  // =========================
-  // ELEMENT REFERENCES
-  // =========================
   const preview = document.getElementById("preview");
   const trimmedVideo = document.getElementById("trimmedvideo");
   const fileInput = document.getElementById("upload");
   const startRange = document.getElementById("startRange");
   const endRange = document.getElementById("endRange");
   const trimBtn = document.getElementById("trimBtn");
-  const timelineWrap = document.getElementById("timelineWrap");
   const thumbStrip = document.getElementById("thumbStrip");
+  const loading = document.getElementById("loading");
 
   let selectedFile = null;
 
-  // =========================
-  // LOAD VIDEO PREVIEW
-  // =========================
   fileInput.addEventListener("change", e => {
     const file = e.target.files[0];
     if (!file) return;
 
     selectedFile = file;
-
-    const url = URL.createObjectURL(file);
-    preview.src = url;
+    preview.src = URL.createObjectURL(file);
+    trimmedVideo.style.display = "none";
+    trimmedVideo.src = "";
+    thumbStrip.innerHTML = "";
 
     preview.addEventListener("loadedmetadata", () => {
       startRange.max = preview.duration;
@@ -42,21 +28,16 @@ document.addEventListener("DOMContentLoaded", () => {
       endRange.value = preview.duration;
 
       generateThumbs(file);
-    });
+    }, { once: true });
   });
 
-  // =========================
-  // GENERATE TIMELINE THUMBNAILS
-  // =========================
   function generateThumbs(file) {
-    thumbStrip.innerHTML = "";
     const video = document.createElement("video");
     video.src = URL.createObjectURL(file);
 
     video.addEventListener("loadedmetadata", () => {
       const duration = video.duration;
       const interval = duration / 8;
-
       let current = 0;
 
       const canvas = document.createElement("canvas");
@@ -70,7 +51,6 @@ document.addEventListener("DOMContentLoaded", () => {
       video.addEventListener("seeked", () => {
         canvas.width = 120;
         canvas.height = 70;
-
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
         const img = document.createElement("img");
@@ -79,29 +59,20 @@ document.addEventListener("DOMContentLoaded", () => {
         thumbStrip.appendChild(img);
 
         current += interval;
-        generate();
+        setTimeout(generate, 0);
       });
 
       generate();
     });
   }
 
-  // =========================
-  // TRIM VIDEO
-  // =========================
   trimBtn.addEventListener("click", async () => {
-    if (!selectedFile) {
-      alert("Upload a video first");
-      return;
-    }
+    if (!selectedFile) return alert("Upload a video first");
 
     const start = parseFloat(startRange.value);
     const end = parseFloat(endRange.value);
 
-    if (start >= end) {
-      alert("Start time must be less than end time");
-      return;
-    }
+    if (start >= end) return alert("Start time must be less than end time");
 
     const formData = new FormData();
     formData.append("video", selectedFile);
@@ -109,11 +80,11 @@ document.addEventListener("DOMContentLoaded", () => {
     formData.append("end", end);
 
     try {
-      const res = await fetch(`${API}/trim`, {
-        method: "POST",
-        body: formData
-      });
+      // Show loading indicator
+      loading.style.display = "block";
+      trimBtn.disabled = true;
 
+      const res = await fetch(`${API}/trim`, { method: "POST", body: formData });
       if (!res.ok) {
         alert("Trimming failed");
         return;
@@ -123,12 +94,18 @@ document.addEventListener("DOMContentLoaded", () => {
       const url = URL.createObjectURL(blob);
 
       trimmedVideo.src = url;
+      trimmedVideo.controls = true;
       trimmedVideo.load();
       trimmedVideo.style.display = "block";
+      trimmedVideo.play().catch(() => {});
 
     } catch (err) {
       console.error(err);
       alert("Error occurred while trimming");
+    } finally {
+      // Hide loading indicator
+      loading.style.display = "none";
+      trimBtn.disabled = false;
     }
   });
 });

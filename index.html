@@ -283,6 +283,9 @@
                     <!-- Controls -->
                     <div class="controls" style="margin-top:15px;">
                         <button id="trimBtn" class="action">Trim & Preview</button>
+                        <!-- Add this in your HTML somewhere -->
+                        <div id="loading" style="display:none;">Trimming video, please wait...</div>
+
                         <button id="resetBtn" class="ghost">Reset</button>
                     </div>
                     </div>
@@ -295,6 +298,7 @@
                     </div>
                     <video id="trimmedvideo" controls playsinline style="width:100%;"></video>
                     <button id="downloadTrimBtn">Download Trimmed Video</button>
+
                     </div>
                 </div>
 
