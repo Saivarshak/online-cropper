@@ -76,8 +76,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const formData = new FormData();
     formData.append("video", selectedFile);
-    formData.append("start", start);
-    formData.append("end", end);
+    formData.append("startTime", start);
+    formData.append("endTime", end);
 
     try {
       // Show loading indicator
