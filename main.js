@@ -11,66 +11,80 @@ document.addEventListener("DOMContentLoaded", () => {
   const loading = document.getElementById("loading");
 
   let selectedFile = null;
+  let previewURL = null;
+  let thumbVideo = null;
 
   fileInput.addEventListener("change", e => {
     const file = e.target.files[0];
     if (!file) return;
 
     selectedFile = file;
-    preview.src = URL.createObjectURL(file);
+
+    if (previewURL) URL.revokeObjectURL(previewURL);
+    previewURL = URL.createObjectURL(file);
+
+    preview.src = previewURL;
     trimmedVideo.style.display = "none";
     trimmedVideo.src = "";
     thumbStrip.innerHTML = "";
 
-    preview.addEventListener("loadedmetadata", () => {
+    preview.onloadedmetadata = () => {
       startRange.max = preview.duration;
       endRange.max = preview.duration;
+      startRange.value = 0;
       endRange.value = preview.duration;
 
-      generateThumbs(file);
-    }, { once: true });
+      generateThumbs(preview);
+    };
   });
 
-  function generateThumbs(file) {
-    const video = document.createElement("video");
-    video.src = URL.createObjectURL(file);
+  function generateThumbs(videoSource) {
+    if (thumbVideo) {
+      thumbVideo.src = "";
+      thumbVideo.remove();
+    }
 
-    video.addEventListener("loadedmetadata", () => {
-      const duration = video.duration;
-      const interval = duration / 8;
-      let current = 0;
+    thumbVideo = document.createElement("video");
+    thumbVideo.src = videoSource.src;
+    thumbVideo.muted = true;
+
+    thumbVideo.onloadedmetadata = () => {
+      const duration = thumbVideo.duration;
+      const count = 6; // reduced thumbnails
+      const interval = duration / count;
+      let index = 0;
 
       const canvas = document.createElement("canvas");
       const ctx = canvas.getContext("2d");
 
-      const generate = () => {
-        if (current > duration) return;
-        video.currentTime = current;
+      const capture = () => {
+        if (index > count) return;
+        thumbVideo.currentTime = interval * index;
       };
 
-      video.addEventListener("seeked", () => {
+      thumbVideo.onseeked = () => {
         canvas.width = 120;
         canvas.height = 70;
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        ctx.drawImage(thumbVideo, 0, 0, canvas.width, canvas.height);
 
         const img = document.createElement("img");
-        img.src = canvas.toDataURL();
+        img.src = canvas.toDataURL("image/jpeg", 0.6);
         img.className = "thumb";
         thumbStrip.appendChild(img);
 
-        current += interval;
-        setTimeout(generate, 0);
-      });
+        index++;
+        requestAnimationFrame(capture);
+      };
 
-      generate();
-    });
+      capture();
+    };
   }
 
   trimBtn.addEventListener("click", async () => {
     if (!selectedFile) return alert("Upload a video first");
 
-    const start = parseFloat(startRange.value);
-    const end = parseFloat(endRange.value);
+    const start = Number(startRange.value);
+    const end = Number(endRange.value);
 
     if (start >= end) return alert("Start time must be less than end time");
 
@@ -80,30 +94,27 @@ document.addEventListener("DOMContentLoaded", () => {
     formData.append("endTime", end);
 
     try {
-      // Show loading indicator
       loading.style.display = "block";
       trimBtn.disabled = true;
 
-      const res = await fetch(`${API}/trim`, { method: "POST", body: formData });
-      if (!res.ok) {
-        alert("Trimming failed");
-        return;
-      }
+      const res = await fetch(`${API}/trim`, {
+        method: "POST",
+        body: formData
+      });
+
+      if (!res.ok) throw new Error("Trim failed");
 
       const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
+      const outputURL = URL.createObjectURL(blob);
 
-      trimmedVideo.src = url;
+      trimmedVideo.src = outputURL;
       trimmedVideo.controls = true;
-      trimmedVideo.load();
       trimmedVideo.style.display = "block";
       trimmedVideo.play().catch(() => {});
-
     } catch (err) {
       console.error(err);
       alert("Error occurred while trimming");
     } finally {
-      // Hide loading indicator
       loading.style.display = "none";
       trimBtn.disabled = false;
     }
