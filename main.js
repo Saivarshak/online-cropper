@@ -1,5 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const API = "https://www.videotrimmer.online/api";
+  const API = "https://www.videotrimmer.online/";
 
   const preview = document.getElementById("preview");
   const trimmedVideo = document.getElementById("trimmedvideo");
