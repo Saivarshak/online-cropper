@@ -263,32 +263,38 @@
                 </div>
 
                 <!-- Trimmer card -->
-                <div class="col-md-5">
+               <div class="col-md-5">
                     <div class="card">
-                    <div class="timeline-wrap" id="timelineWrap">
+                        <div class="timeline-wrap" id="timelineWrap">
+
                         <div id="thumbStrip" class="thumb-strip"></div>
 
-                        <div id="startRange" type="range" class="handle start-handle" style="left:0">
-                        <div class="peg"></div>
-                        <div id="startBubble" class="time-bubble" style="left:18px;">00:00</div>
+                        <!-- REAL RANGE INPUTS (JS USES THESE) -->
+                        <input type="range" id="startRange" min="0" value="0" step="0.01" hidden>
+                        <input type="range" id="endRange" min="0" value="0" step="0.01" hidden>
+
+                        <!-- VISUAL HANDLES -->
+                        <div class="handle start-handle" style="left:0">
+                            <div class="peg"></div>
+                            <div id="startBubble" class="time-bubble" style="left:18px;">00:00</div>
                         </div>
 
-                        <div id="endRange" type="range" class="handle end-handle" style="left:calc(100% - 14px)">
-                        <div class="peg"></div>
-                        <div id="endBubble" class="time-bubble" style="right:18px;">00:00</div>
+                        <div class="handle end-handle" style="left:calc(100% - 14px)">
+                            <div class="peg"></div>
+                            <div id="endBubble" class="time-bubble" style="right:18px;">00:00</div>
                         </div>
-                    </div>
 
-                    <!-- Controls -->
-                    <div class="controls" style="margin-top:15px;">
+                        </div>
+
+                        <!-- Controls -->
+                        <div class="controls" style="margin-top:15px;">
                         <button id="trimBtn" class="action">Trim & Preview</button>
-                        <!-- Add this in your HTML somewhere -->
                         <div id="loading" style="display:none;">Trimming video, please wait...</div>
-
                         <button id="resetBtn" class="ghost">Reset</button>
+                        </div>
                     </div>
                     </div>
-                </div>      
+    
 
                 <div class="col-md-12" id="scrool">
                     <div class="card">

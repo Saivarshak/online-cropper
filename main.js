@@ -7,8 +7,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const startRange = document.getElementById("startRange");
   const endRange = document.getElementById("endRange");
   const trimBtn = document.getElementById("trimBtn");
+  const resetBtn = document.getElementById("resetBtn");
   const thumbStrip = document.getElementById("thumbStrip");
   const loading = document.getElementById("loading");
+  const startBubble = document.getElementById("startBubble");
+  const endBubble = document.getElementById("endBubble");
 
   let selectedFile = null;
   let previewURL = null;
@@ -37,9 +40,26 @@ document.addEventListener("DOMContentLoaded", () => {
       startRange.value = 0;
       endRange.value = preview.duration;
 
+      updateBubbles();
       generateThumbs(preview);
     };
   });
+
+  // ===============================
+  // Update bubbles
+  // ===============================
+  function updateBubbles() {
+    const formatTime = t => {
+      const min = Math.floor(t / 60);
+      const sec = Math.floor(t % 60);
+      return `${min.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
+    };
+    startBubble.textContent = formatTime(startRange.value);
+    endBubble.textContent = formatTime(endRange.value);
+  }
+
+  startRange.addEventListener("input", updateBubbles);
+  endRange.addEventListener("input", updateBubbles);
 
   // ===============================
   // Thumbnail generation
@@ -87,7 +107,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // ===============================
-  // Upload + Trim (FIXED FLOW)
+  // Upload + Trim video
   // ===============================
   trimBtn.addEventListener("click", async () => {
     if (!selectedFile) {
@@ -107,7 +127,7 @@ document.addEventListener("DOMContentLoaded", () => {
       loading.style.display = "block";
       trimBtn.disabled = true;
 
-      // STEP 1: Upload video
+      // Step 1: Upload video
       const uploadData = new FormData();
       uploadData.append("video", selectedFile);
 
@@ -121,34 +141,52 @@ document.addEventListener("DOMContentLoaded", () => {
       const uploadJson = await uploadRes.json();
       const filename = uploadJson.filename;
 
-      // STEP 2: Trim video
+      // Step 2: Trim video
       const trimRes = await fetch(`${API}/trim`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          filename,
-          start,
-          end
-        })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename, start, end })
       });
 
-      if (!trimRes.ok) throw new Error("Trim failed");
+      if (!trimRes.ok) {
+        const errJson = await trimRes.json().catch(() => ({}));
+        throw new Error(errJson.error || "Trim failed");
+      }
 
       const trimJson = await trimRes.json();
 
-      // STEP 3: Play trimmed video
+      // Step 3: Play trimmed video
       trimmedVideo.src = API + trimJson.url;
       trimmedVideo.controls = true;
       trimmedVideo.style.display = "block";
-      trimmedVideo.play().catch(() => {});
+
+      // Handle deleted or unavailable videos
+      trimmedVideo.onerror = () => {
+        alert("The trimmed video is no longer available. Please try again.");
+        trimmedVideo.style.display = "none";
+      };
+
+      await trimmedVideo.play().catch(() => {});
     } catch (err) {
       console.error(err);
-      alert("Error occurred while trimming");
+      alert(err.message || "Error occurred while trimming");
     } finally {
       loading.style.display = "none";
       trimBtn.disabled = false;
     }
+  });
+
+  // ===============================
+  // Reset button
+  // ===============================
+  resetBtn.addEventListener("click", () => {
+    selectedFile = null;
+    preview.src = "";
+    trimmedVideo.src = "";
+    trimmedVideo.style.display = "none";
+    thumbStrip.innerHTML = "";
+    startRange.value = 0;
+    endRange.value = 0;
+    updateBubbles();
   });
 });
