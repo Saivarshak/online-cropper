@@ -3,7 +3,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const preview = document.getElementById("preview");
   const trimmedVideo = document.getElementById("trimmedvideo");
-  const fileInput = document.getElementById("upload");
+  const fileInput = document.getElementById("fileInput");
   const startRange = document.getElementById("startRange");
   const endRange = document.getElementById("endRange");
   const trimBtn = document.getElementById("trimBtn");
@@ -14,6 +14,9 @@ document.addEventListener("DOMContentLoaded", () => {
   let previewURL = null;
   let thumbVideo = null;
 
+  // ===============================
+  // File selection + preview
+  // ===============================
   fileInput.addEventListener("change", e => {
     const file = e.target.files[0];
     if (!file) return;
@@ -38,6 +41,9 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   });
 
+  // ===============================
+  // Thumbnail generation
+  // ===============================
   function generateThumbs(videoSource) {
     if (thumbVideo) {
       thumbVideo.src = "";
@@ -50,7 +56,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     thumbVideo.onloadedmetadata = () => {
       const duration = thumbVideo.duration;
-      const count = 6; // reduced thumbnails
+      const count = 6;
       const interval = duration / count;
       let index = 0;
 
@@ -80,34 +86,60 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 
+  // ===============================
+  // Upload + Trim (FIXED FLOW)
+  // ===============================
   trimBtn.addEventListener("click", async () => {
-    if (!selectedFile) return alert("Upload a video first");
+    if (!selectedFile) {
+      alert("Upload a video first");
+      return;
+    }
 
     const start = Number(startRange.value);
     const end = Number(endRange.value);
 
-    if (start >= end) return alert("Start time must be less than end time");
-
-    const formData = new FormData();
-    formData.append("video", selectedFile);
-    formData.append("startTime", start);
-    formData.append("endTime", end);
+    if (start >= end) {
+      alert("Start time must be less than end time");
+      return;
+    }
 
     try {
       loading.style.display = "block";
       trimBtn.disabled = true;
 
-      const res = await fetch(`${API}/trim`, {
+      // STEP 1: Upload video
+      const uploadData = new FormData();
+      uploadData.append("video", selectedFile);
+
+      const uploadRes = await fetch(`${API}/upload`, {
         method: "POST",
-        body: formData
+        body: uploadData
       });
 
-      if (!res.ok) throw new Error("Trim failed");
+      if (!uploadRes.ok) throw new Error("Upload failed");
 
-      const blob = await res.blob();
-      const outputURL = URL.createObjectURL(blob);
+      const uploadJson = await uploadRes.json();
+      const filename = uploadJson.filename;
 
-      trimmedVideo.src = outputURL;
+      // STEP 2: Trim video
+      const trimRes = await fetch(`${API}/trim`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          filename,
+          start,
+          end
+        })
+      });
+
+      if (!trimRes.ok) throw new Error("Trim failed");
+
+      const trimJson = await trimRes.json();
+
+      // STEP 3: Play trimmed video
+      trimmedVideo.src = API + trimJson.url;
       trimmedVideo.controls = true;
       trimmedVideo.style.display = "block";
       trimmedVideo.play().catch(() => {});
