@@ -3,7 +3,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const preview = document.getElementById("preview");
   const trimmedVideo = document.getElementById("trimmedvideo");
-  const UploadInput = document.getElementById("UploadInput");
+  const uploadInput = document.getElementById("UploadInput");
   const startRange = document.getElementById("startRange");
   const endRange = document.getElementById("endRange");
   const trimBtn = document.getElementById("trimBtn");
@@ -20,17 +20,12 @@ document.addEventListener("DOMContentLoaded", () => {
   // ===============================
   // File selection + preview
   // ===============================
-
-  UploadInput.addEventListener("change", e => {
+  uploadInput.addEventListener("change", e => {
     const file = e.target.files[0];
     if (!file) return;
 
-    console.log(file.name);
-    console.log(document.getElementById("UploadInput"));
-
-
-
     selectedFile = file;
+    console.log(file.name);
 
     if (previewURL) URL.revokeObjectURL(previewURL);
     previewURL = URL.createObjectURL(file);
@@ -52,14 +47,17 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // ===============================
-  // Update bubbles
+  // Update time bubbles
   // ===============================
   function updateBubbles() {
     const formatTime = t => {
       const min = Math.floor(t / 60);
       const sec = Math.floor(t % 60);
-      return `${min.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
+      return `${min.toString().padStart(2, "0")}:${sec
+        .toString()
+        .padStart(2, "0")}`;
     };
+
     startBubble.textContent = formatTime(startRange.value);
     endBubble.textContent = formatTime(endRange.value);
   }
@@ -133,7 +131,7 @@ document.addEventListener("DOMContentLoaded", () => {
       loading.style.display = "block";
       trimBtn.disabled = true;
 
-      // Step 1: Upload video
+      // Upload
       const uploadData = new FormData();
       uploadData.append("video", selectedFile);
 
@@ -147,35 +145,31 @@ document.addEventListener("DOMContentLoaded", () => {
       const uploadJson = await uploadRes.json();
       const filename = uploadJson.filename;
 
-      // Step 2: Trim video
+      // Trim
       const trimRes = await fetch(`${API}/trim`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ filename, start, end })
       });
 
-      if (!trimRes.ok) {
-        const errJson = await trimRes.json().catch(() => ({}));
-        throw new Error(errJson.error || "Trim failed");
-      }
+      if (!trimRes.ok) throw new Error("Trim failed");
 
       const trimJson = await trimRes.json();
 
-      // Step 3: Play trimmed video
+      // Play trimmed video
       trimmedVideo.src = API + trimJson.url;
       trimmedVideo.controls = true;
       trimmedVideo.style.display = "block";
 
-      // Handle deleted or unavailable videos
       trimmedVideo.onerror = () => {
-        alert("The trimmed video is no longer available. Please try again.");
+        alert("Trimmed video not available. Try again.");
         trimmedVideo.style.display = "none";
       };
 
       await trimmedVideo.play().catch(() => {});
     } catch (err) {
       console.error(err);
-      alert(err.message || "Error occurred while trimming");
+      alert(err.message || "Something went wrong");
     } finally {
       loading.style.display = "none";
       trimBtn.disabled = false;
@@ -183,7 +177,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // ===============================
-  // Reset button
+  // Reset
   // ===============================
   resetBtn.addEventListener("click", () => {
     selectedFile = null;
@@ -196,18 +190,3 @@ document.addEventListener("DOMContentLoaded", () => {
     updateBubbles();
   });
 });
-
-// // download trimmed video
-// document.getElementById('trimBtn').addEventListener('click', function() {
-//     const videoUrl = document.getElementById('trimmedvideo').src;
-//     if (videoUrl) {
-//         const a = document.createElement('a');
-//         a.href = videoUrl;
-//         a.download = 'trimmed_video.mp4'; // You can set the desired filename here
-//         document.body.appendChild(a);
-//         a.click();
-//         document.body.removeChild(a);
-//     } else {
-//         alert('No video to download. Please trim a video first.');
-//     }
-// });
