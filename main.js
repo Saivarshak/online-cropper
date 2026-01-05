@@ -20,9 +20,15 @@ document.addEventListener("DOMContentLoaded", () => {
   // ===============================
   // File selection + preview
   // ===============================
+
   fileInput.addEventListener("change", e => {
     const file = e.target.files[0];
     if (!file) return;
+
+    console.log(file.name);
+    console.log(document.getElementById("fileInput"));
+
+
 
     selectedFile = file;
 
