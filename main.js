@@ -197,17 +197,17 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
-// download trimmed video
-document.getElementById('trimBtn').addEventListener('click', function() {
-    const videoUrl = document.getElementById('trimmedvideo').src;
-    if (videoUrl) {
-        const a = document.createElement('a');
-        a.href = videoUrl;
-        a.download = 'trimmed_video.mp4'; // You can set the desired filename here
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-    } else {
-        alert('No video to download. Please trim a video first.');
-    }
-});
+// // download trimmed video
+// document.getElementById('trimBtn').addEventListener('click', function() {
+//     const videoUrl = document.getElementById('trimmedvideo').src;
+//     if (videoUrl) {
+//         const a = document.createElement('a');
+//         a.href = videoUrl;
+//         a.download = 'trimmed_video.mp4'; // You can set the desired filename here
+//         document.body.appendChild(a);
+//         a.click();
+//         document.body.removeChild(a);
+//     } else {
+//         alert('No video to download. Please trim a video first.');
+//     }
+// });
