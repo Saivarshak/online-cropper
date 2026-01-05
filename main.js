@@ -3,7 +3,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const preview = document.getElementById("preview");
   const trimmedVideo = document.getElementById("trimmedvideo");
-  const fileInput = document.getElementById("fileInput");
+  const UploadInput = document.getElementById("UploadInput");
   const startRange = document.getElementById("startRange");
   const endRange = document.getElementById("endRange");
   const trimBtn = document.getElementById("trimBtn");
@@ -21,12 +21,12 @@ document.addEventListener("DOMContentLoaded", () => {
   // File selection + preview
   // ===============================
 
-  fileInput.addEventListener("change", e => {
+  UploadInput.addEventListener("change", e => {
     const file = e.target.files[0];
     if (!file) return;
 
     console.log(file.name);
-    console.log(document.getElementById("fileInput"));
+    console.log(document.getElementById("UploadInput"));
 
 
 
@@ -195,4 +195,19 @@ document.addEventListener("DOMContentLoaded", () => {
     endRange.value = 0;
     updateBubbles();
   });
+});
+
+// download trimmed video
+document.getElementById('trimBtn').addEventListener('click', function() {
+    const videoUrl = document.getElementById('trimmedvideo').src;
+    if (videoUrl) {
+        const a = document.createElement('a');
+        a.href = videoUrl;
+        a.download = 'trimmed_video.mp4'; // You can set the desired filename here
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    } else {
+        alert('No video to download. Please trim a video first.');
+    }
 });
