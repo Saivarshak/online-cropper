@@ -199,96 +199,95 @@ document.addEventListener("DOMContentLoaded", () => {
       generateThumbs(preview);
     };
   });
+// ======================
+// Load URL
+// ======================
+loadUrlBtn.addEventListener("click", async () => {
+  const url = videoUrlInput.value.trim();
+  if (!url) return alert("Paste a direct MP4 / WEBM URL");
 
-  // ======================
-  // Load URL
-  // ======================
-  loadUrlBtn.addEventListener("click", async () => {
-    const url = videoUrlInput.value.trim();
-    if (!url) return alert("Paste a direct MP4 / WEBM URL");
+  try {
+    loading.style.display = "block";
 
-    try {
-      loading.style.display = "block";
+    const res = await fetch(`${API}/download-url`, {  // <-- added single slash
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url })
+    });
 
-      const res = await fetch(`${API}download-url`, {
+    if (!res.ok) throw new Error("Failed to load video");
+
+    const data = await res.json();
+    uploadedFilename = data.filename;
+
+    preview.src = `${API}${data.url.startsWith("/") ? "" : "/"}${data.url}`; // <-- fix double slash
+    preview.load();
+
+    preview.onloadedmetadata = () => {
+      startRange.max = preview.duration;
+      endRange.max = preview.duration;
+      startRange.value = 0;
+      endRange.value = preview.duration;
+      updateBubbles();
+      updateHandlesFromRanges();
+      generateThumbs(preview);
+    };
+  } catch (err) {
+    alert(err.message);
+  } finally {
+    loading.style.display = "none";
+  }
+});
+
+// ======================
+// Trim
+// ======================
+trimBtn.addEventListener("click", async () => {
+  const start = Number(startRange.value);
+  const end = Number(endRange.value);
+
+  if (start >= end) return alert("Invalid trim range");
+
+  try {
+    loading.style.display = "block";
+    trimBtn.disabled = true;
+    downloadBtn.disabled = true;
+
+    if (selectedFile && !uploadedFilename) {
+      const fd = new FormData();
+      fd.append("video", selectedFile);
+
+      const uploadRes = await fetch(`${API}/upload`, {  // <-- added single slash
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url })
+        body: fd
       });
 
-      if (!res.ok) throw new Error("Failed to load video");
-
-      const data = await res.json();
-      uploadedFilename = data.filename;
-
-      preview.src = API + data.url;
-      preview.load();
-
-      preview.onloadedmetadata = () => {
-        startRange.max = preview.duration;
-        endRange.max = preview.duration;
-        startRange.value = 0;
-        endRange.value = preview.duration;
-        updateBubbles();
-        updateHandlesFromRanges();
-        generateThumbs(preview);
-      };
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      loading.style.display = "none";
+      const uploadData = await uploadRes.json();
+      uploadedFilename = uploadData.filename;
     }
-  });
 
-  // ======================
-  // Trim
-  // ======================
-  trimBtn.addEventListener("click", async () => {
-    const start = Number(startRange.value);
-    const end = Number(endRange.value);
+    const trimRes = await fetch(`${API}/trim`, {  // <-- added single slash
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filename: uploadedFilename, start, end })
+    });
 
-    if (start >= end) return alert("Invalid trim range");
+    const trimData = await trimRes.json();
 
-    try {
-      loading.style.display = "block";
-      trimBtn.disabled = true;
-      downloadBtn.disabled = true;
+    trimmedVideo.src = `${API}${trimData.url.startsWith("/") ? "" : "/"}${trimData.url}`; // <-- fix double slash
+    trimmedVideo.style.display = "block";
+    trimmedVideo.controls = true;
 
-      if (selectedFile && !uploadedFilename) {
-        const fd = new FormData();
-        fd.append("video", selectedFile);
-
-        const uploadRes = await fetch(`${API}upload`, {
-          method: "POST",
-          body: fd
-        });
-
-        const uploadData = await uploadRes.json();
-        uploadedFilename = uploadData.filename;
-      }
-
-      const trimRes = await fetch(`${API}trim`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename: uploadedFilename, start, end })
-      });
-
-      const trimData = await trimRes.json();
-
-      trimmedVideo.src = API + trimData.url;
-      trimmedVideo.style.display = "block";
-      trimmedVideo.controls = true;
-
-      trimmedVideo.onloadeddata = () => {
-        downloadBtn.disabled = false;
-      };
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      loading.style.display = "none";
-      trimBtn.disabled = false;
-    }
-  });
+    trimmedVideo.onloadeddata = () => {
+      downloadBtn.disabled = false;
+    };
+  } catch (err) {
+    alert(err.message);
+  } finally {
+    loading.style.display = "none";
+    trimBtn.disabled = false;
+  }
+});
 
   // ======================
   // Download
