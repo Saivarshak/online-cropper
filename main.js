@@ -1,5 +1,6 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const API = "https://video-trimmer-backend.onrender.com/";
+  const API = "https://video-trimmer-backend.onrender.com";
+  
 
   const preview = document.getElementById("preview");
   const trimmedVideo = document.getElementById("trimmedvideo");
@@ -318,3 +319,5 @@ document.addEventListener("DOMContentLoaded", () => {
     updateHandlesFromRanges();
   });
 });
+
+console.log("Frontend loaded");
