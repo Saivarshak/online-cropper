@@ -236,4 +236,4 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
-console.log("Frontend loaded");
+console.log("Server Started...");
