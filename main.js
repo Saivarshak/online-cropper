@@ -1,5 +1,6 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const API = "https://www.videotrimmer.online";
+  // Backend API (Render)
+  const API = "https://video-trimmer-backend.onrender.com";
 
   const preview = document.getElementById("preview");
   const trimmedVideo = document.getElementById("trimmedvideo");
@@ -32,7 +33,9 @@ document.addEventListener("DOMContentLoaded", () => {
   function formatTime(t) {
     const m = Math.floor(t / 60);
     const s = Math.floor(t % 60);
-    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+    return `${m.toString().padStart(2, "0")}:${s
+      .toString()
+      .padStart(2, "0")}`;
   }
 
   function updateBubbles() {
@@ -196,10 +199,12 @@ document.addEventListener("DOMContentLoaded", () => {
       trimmedVideo.controls = true;
 
       trimmedVideo.onloadeddata = () => {
-        trimmedVideo.scrollIntoView({ behavior: "smooth", block: "center" });
+        trimmedVideo.scrollIntoView({
+          behavior: "smooth",
+          block: "center"
+        });
         downloadBtn.disabled = false;
       };
-
     } catch (err) {
       alert(err.message);
     } finally {
