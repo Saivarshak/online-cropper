@@ -1,6 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
   // Ensure trailing slash and correct HTTPS
-  const API = "https://video-trimmer-backend.onrender.com/";
+  const API = "https://video-trimmer-backend.onrender.com/"; 
+
 
   const preview = document.getElementById("preview");
   const trimmedVideo = document.getElementById("trimmedvideo");
