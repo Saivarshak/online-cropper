@@ -1,5 +1,4 @@
 document.addEventListener("DOMContentLoaded", () => {
-  // Backend API (Render)
   const API = "https://video-trimmer-backend.onrender.com";
 
   const preview = document.getElementById("preview");
@@ -27,15 +26,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   downloadBtn.disabled = true;
 
-  /* ===============================
-     Helpers
-  ================================ */
   function formatTime(t) {
     const m = Math.floor(t / 60);
     const s = Math.floor(t % 60);
-    return `${m.toString().padStart(2, "0")}:${s
-      .toString()
-      .padStart(2, "0")}`;
+    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   }
 
   function updateBubbles() {
@@ -50,9 +44,6 @@ document.addEventListener("DOMContentLoaded", () => {
     preview.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
-  /* ===============================
-     Thumbnail generation
-  ================================ */
   function generateThumbs(videoEl) {
     thumbStrip.innerHTML = "";
 
@@ -87,9 +78,6 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 
-  /* ===============================
-     Upload local video
-  ================================ */
   uploadInput.addEventListener("change", e => {
     const file = e.target.files[0];
     if (!file) return;
@@ -115,9 +103,6 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   });
 
-  /* ===============================
-     Load video from URL
-  ================================ */
   loadUrlBtn.addEventListener("click", async () => {
     const url = videoUrlInput.value.trim();
     if (!url) return alert("Paste a video URL");
@@ -155,9 +140,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  /* ===============================
-     Trim video
-  ================================ */
   trimBtn.addEventListener("click", async () => {
     const start = Number(startRange.value);
     const end = Number(endRange.value);
@@ -199,10 +181,7 @@ document.addEventListener("DOMContentLoaded", () => {
       trimmedVideo.controls = true;
 
       trimmedVideo.onloadeddata = () => {
-        trimmedVideo.scrollIntoView({
-          behavior: "smooth",
-          block: "center"
-        });
+        trimmedVideo.scrollIntoView({ behavior: "smooth", block: "center" });
         downloadBtn.disabled = false;
       };
     } catch (err) {
@@ -213,9 +192,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  /* ===============================
-     Download trimmed video
-  ================================ */
   downloadBtn.addEventListener("click", () => {
     if (!trimmedVideo.src) return;
 
@@ -227,9 +203,6 @@ document.addEventListener("DOMContentLoaded", () => {
     document.body.removeChild(a);
   });
 
-  /* ===============================
-     Reset
-  ================================ */
   resetBtn.addEventListener("click", () => {
     selectedFile = null;
     uploadedFilename = null;
