@@ -1,6 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
   const API = "https://video-trimmer-backend.onrender.com";
-  
 
   const preview = document.getElementById("preview");
   const trimmedVideo = document.getElementById("trimmedvideo");
@@ -17,9 +16,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const loadUrlBtn = document.getElementById("loadUrlBtn");
   const downloadBtn = document.getElementById("downloadBtn");
 
-  const thumbStrip = document.getElementById("thumbStrip");
   const loading = document.getElementById("loading");
-
   const timelineWrap = document.getElementById("timelineWrap");
   const startHandle = document.querySelector(".start-handle");
   const endHandle = document.querySelector(".end-handle");
@@ -27,20 +24,17 @@ document.addEventListener("DOMContentLoaded", () => {
   let selectedFile = null;
   let uploadedFilename = null;
   let previewURL = null;
-  let thumbVideo = null;
   let activeHandle = null;
 
   downloadBtn.disabled = true;
 
   // ======================
-  // Time helpers
+  // Helpers
   // ======================
   function formatTime(t) {
     const m = Math.floor(t / 60);
     const s = Math.floor(t % 60);
-    return `${m.toString().padStart(2, "0")}:${s
-      .toString()
-      .padStart(2, "0")}`;
+    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   }
 
   function updateBubbles() {
@@ -48,29 +42,24 @@ document.addEventListener("DOMContentLoaded", () => {
     endBubble.textContent = formatTime(endRange.value);
   }
 
-  function valueToPercent(value) {
-    return (value / startRange.max) * 100;
+  function valueToPercent(v) {
+    return (v / startRange.max) * 100;
   }
 
-  function percentToValue(percent) {
-    return (percent / 100) * startRange.max;
+  function percentToValue(p) {
+    return (p / 100) * startRange.max;
   }
 
-  function updateHandlesFromRanges() {
+  function updateHandles() {
     startHandle.style.left = `${valueToPercent(startRange.value)}%`;
     endHandle.style.left = `${valueToPercent(endRange.value)}%`;
   }
 
   // ======================
-  // Handle dragging
+  // Handle drag
   // ======================
-  startHandle.addEventListener("mousedown", () => {
-    activeHandle = "start";
-  });
-
-  endHandle.addEventListener("mousedown", () => {
-    activeHandle = "end";
-  });
+  startHandle.addEventListener("mousedown", () => activeHandle = "start");
+  endHandle.addEventListener("mousedown", () => activeHandle = "end");
 
   document.addEventListener("mousemove", e => {
     if (!activeHandle) return;
@@ -78,7 +67,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const rect = timelineWrap.getBoundingClientRect();
     let percent = ((e.clientX - rect.left) / rect.width) * 100;
     percent = Math.max(0, Math.min(100, percent));
-
     const value = percentToValue(percent);
 
     if (activeHandle === "start" && value < endRange.value) {
@@ -90,90 +78,13 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     updateBubbles();
-    updateHandlesFromRanges();
+    updateHandles();
   });
 
-  document.addEventListener("mouseup", () => {
-    activeHandle = null;
-  });
+  document.addEventListener("mouseup", () => activeHandle = null);
 
   // ======================
-  // Click-to-seek on timeline
-  // ======================
-  timelineWrap.addEventListener("click", e => {
-    if (e.target.closest(".handle")) return;
-
-    const rect = timelineWrap.getBoundingClientRect();
-    let percent = ((e.clientX - rect.left) / rect.width) * 100;
-    percent = Math.max(0, Math.min(100, percent));
-
-    const value = percentToValue(percent);
-
-    const distToStart = Math.abs(value - startRange.value);
-    const distToEnd = Math.abs(value - endRange.value);
-
-    if (distToStart < distToEnd && value < endRange.value) {
-      startRange.value = value;
-    } else if (value > startRange.value) {
-      endRange.value = value;
-    }
-
-    updateBubbles();
-    updateHandlesFromRanges();
-
-    if (!isNaN(preview.duration)) {
-      preview.currentTime = value;
-    }
-  });
-
-  startRange.addEventListener("input", () => {
-    updateBubbles();
-    updateHandlesFromRanges();
-  });
-
-  endRange.addEventListener("input", () => {
-    updateBubbles();
-    updateHandlesFromRanges();
-  });
-
-  // ======================
-  // Thumbnails
-  // ======================
-  function generateThumbs(videoEl) {
-    thumbStrip.innerHTML = "";
-    if (thumbVideo) thumbVideo.remove();
-
-    thumbVideo = document.createElement("video");
-    thumbVideo.src = videoEl.src;
-    thumbVideo.muted = true;
-
-    thumbVideo.onloadedmetadata = () => {
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-      const count = 6;
-      const interval = thumbVideo.duration / count;
-      let i = 0;
-
-      thumbVideo.onseeked = () => {
-        canvas.width = 120;
-        canvas.height = 70;
-        ctx.drawImage(thumbVideo, 0, 0, canvas.width, canvas.height);
-
-        const img = document.createElement("img");
-        img.src = canvas.toDataURL("image/jpeg", 0.6);
-        img.className = "thumb";
-        thumbStrip.appendChild(img);
-
-        i++;
-        if (i <= count) thumbVideo.currentTime = i * interval;
-      };
-
-      thumbVideo.currentTime = 0;
-    };
-  }
-
-  // ======================
-  // Upload file
+  // Upload local file
   // ======================
   uploadInput.addEventListener("change", e => {
     const file = e.target.files[0];
@@ -195,99 +106,102 @@ document.addEventListener("DOMContentLoaded", () => {
       startRange.value = 0;
       endRange.value = preview.duration;
       updateBubbles();
-      updateHandlesFromRanges();
-      generateThumbs(preview);
+      updateHandles();
     };
   });
-// ======================
-// Load URL
-// ======================
-loadUrlBtn.addEventListener("click", async () => {
-  const url = videoUrlInput.value.trim();
-  if (!url) return alert("Paste a direct MP4 / WEBM URL");
 
-  try {
-    loading.style.display = "block";
+  // ======================
+  // Load from URL
+  // ======================
+  loadUrlBtn.addEventListener("click", async () => {
+    const url = videoUrlInput.value.trim();
+    if (!url) return alert("Paste a video URL");
 
-    const res = await fetch(`${API}/download-url`, {  // <-- added single slash
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url })
-    });
+    try {
+      loading.style.display = "block";
 
-    if (!res.ok) throw new Error("Failed to load video");
-
-    const data = await res.json();
-    uploadedFilename = data.filename;
-
-    preview.src = `${API}${data.url.startsWith("/") ? "" : "/"}${data.url}`; // <-- fix double slash
-    preview.load();
-
-    preview.onloadedmetadata = () => {
-      startRange.max = preview.duration;
-      endRange.max = preview.duration;
-      startRange.value = 0;
-      endRange.value = preview.duration;
-      updateBubbles();
-      updateHandlesFromRanges();
-      generateThumbs(preview);
-    };
-  } catch (err) {
-    alert(err.message);
-  } finally {
-    loading.style.display = "none";
-  }
-});
-
-// ======================
-// Trim
-// ======================
-trimBtn.addEventListener("click", async () => {
-  const start = Number(startRange.value);
-  const end = Number(endRange.value);
-
-  if (start >= end) return alert("Invalid trim range");
-
-  try {
-    loading.style.display = "block";
-    trimBtn.disabled = true;
-    downloadBtn.disabled = true;
-
-    if (selectedFile && !uploadedFilename) {
-      const fd = new FormData();
-      fd.append("video", selectedFile);
-
-      const uploadRes = await fetch(`${API}/upload`, {  // <-- added single slash
+      const res = await fetch(`${API}/download-url`, {
         method: "POST",
-        body: fd
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url })
       });
 
-      const uploadData = await uploadRes.json();
-      uploadedFilename = uploadData.filename;
+      if (!res.ok) throw new Error("Failed to load video");
+
+      const data = await res.json();
+      uploadedFilename = data.filename;
+
+      preview.src = `${API}${data.url}`;
+      preview.load();
+
+      preview.onloadedmetadata = () => {
+        startRange.max = preview.duration;
+        endRange.max = preview.duration;
+        startRange.value = 0;
+        endRange.value = preview.duration;
+        updateBubbles();
+        updateHandles();
+      };
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      loading.style.display = "none";
     }
+  });
 
-    const trimRes = await fetch(`${API}/trim`, {  // <-- added single slash
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filename: uploadedFilename, start, end })
-    });
+  // ======================
+  // Trim
+  // ======================
+  trimBtn.addEventListener("click", async () => {
+    const start = Number(startRange.value);
+    const end = Number(endRange.value);
 
-    const trimData = await trimRes.json();
+    if (start >= end) return alert("Invalid trim range");
 
-    trimmedVideo.src = `${API}${trimData.url.startsWith("/") ? "" : "/"}${trimData.url}`; // <-- fix double slash
-    trimmedVideo.style.display = "block";
-    trimmedVideo.controls = true;
+    try {
+      loading.style.display = "block";
+      trimBtn.disabled = true;
+      downloadBtn.disabled = true;
 
-    trimmedVideo.onloadeddata = () => {
-      downloadBtn.disabled = false;
-    };
-  } catch (err) {
-    alert(err.message);
-  } finally {
-    loading.style.display = "none";
-    trimBtn.disabled = false;
-  }
-});
+      if (selectedFile && !uploadedFilename) {
+        const fd = new FormData();
+        fd.append("video", selectedFile);
+
+        const uploadRes = await fetch(`${API}/upload`, {
+          method: "POST",
+          body: fd
+        });
+
+        if (!uploadRes.ok) throw new Error("Upload failed");
+
+        const uploadData = await uploadRes.json();
+        uploadedFilename = uploadData.filename;
+      }
+
+      const trimRes = await fetch(`${API}/trim`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename: uploadedFilename, start, end })
+      });
+
+      if (!trimRes.ok) throw new Error("Trim failed");
+
+      const trimData = await trimRes.json();
+
+      trimmedVideo.src = `${API}${trimData.url}`;
+      trimmedVideo.style.display = "block";
+      trimmedVideo.controls = true;
+
+      trimmedVideo.onloadeddata = () => {
+        downloadBtn.disabled = false;
+      };
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      loading.style.display = "none";
+      trimBtn.disabled = false;
+    }
+  });
 
   // ======================
   // Download
@@ -307,15 +221,18 @@ trimBtn.addEventListener("click", async () => {
   resetBtn.addEventListener("click", () => {
     selectedFile = null;
     uploadedFilename = null;
+
     preview.src = "";
     trimmedVideo.src = "";
     trimmedVideo.style.display = "none";
+
     downloadBtn.disabled = true;
-    thumbStrip.innerHTML = "";
+
     startRange.value = 0;
     endRange.value = 0;
+
     updateBubbles();
-    updateHandlesFromRanges();
+    updateHandles();
   });
 });
 
