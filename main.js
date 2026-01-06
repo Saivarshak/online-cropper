@@ -120,6 +120,10 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       loading.style.display = "block";
 
+      // reset the upload state but DO NOT touch the upload logic
+      selectedFile = null;
+      uploadedFilename = null;
+
       const res = await fetch(`${API}/download-url`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -131,8 +135,12 @@ document.addEventListener("DOMContentLoaded", () => {
       const data = await res.json();
       uploadedFilename = data.filename;
 
+      // load the video in preview just like an upload
       preview.src = `${API}${data.url}`;
       preview.load();
+
+      trimmedVideo.style.display = "none";
+      downloadBtn.disabled = true;
 
       preview.onloadedmetadata = () => {
         startRange.max = preview.duration;
