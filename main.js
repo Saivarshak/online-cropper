@@ -1,5 +1,6 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const API = "https://video-trimmer-backend.onrender.com";
+  // Ensure trailing slash and correct HTTPS
+  const API = "https://video-trimmer-backend.onrender.com/";
 
   const preview = document.getElementById("preview");
   const trimmedVideo = document.getElementById("trimmedvideo");
@@ -46,7 +47,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function generateThumbs(videoEl) {
     thumbStrip.innerHTML = "";
-
     if (thumbVideo) thumbVideo.remove();
 
     thumbVideo = document.createElement("video");
@@ -110,10 +110,12 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       loading.style.display = "block";
 
-      const res = await fetch(`${API}/download-url`, {
+      const res = await fetch(`${API}download-url`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url })
+        body: JSON.stringify({ url }),
+        // Important for cross-origin request
+        credentials: "include",
       });
 
       if (!res.ok) throw new Error("URL load failed");
@@ -155,9 +157,10 @@ document.addEventListener("DOMContentLoaded", () => {
         const fd = new FormData();
         fd.append("video", selectedFile);
 
-        const uploadRes = await fetch(`${API}/upload`, {
+        const uploadRes = await fetch(`${API}upload`, {
           method: "POST",
-          body: fd
+          body: fd,
+          credentials: "include",
         });
 
         if (!uploadRes.ok) throw new Error("Upload failed");
@@ -166,10 +169,11 @@ document.addEventListener("DOMContentLoaded", () => {
         uploadedFilename = uploadData.filename;
       }
 
-      const trimRes = await fetch(`${API}/trim`, {
+      const trimRes = await fetch(`${API}trim`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename: uploadedFilename, start, end })
+        body: JSON.stringify({ filename: uploadedFilename, start, end }),
+        credentials: "include",
       });
 
       if (!trimRes.ok) throw new Error("Trim failed");
