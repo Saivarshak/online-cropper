@@ -28,9 +28,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   downloadBtn.disabled = true;
 
-  // ======================
-  // Helpers
-  // ======================
   function formatTime(t) {
     const m = Math.floor(t / 60);
     const s = Math.floor(t % 60);
@@ -55,9 +52,6 @@ document.addEventListener("DOMContentLoaded", () => {
     endHandle.style.left = `${valueToPercent(endRange.value)}%`;
   }
 
-  // ======================
-  // Handle drag
-  // ======================
   startHandle.addEventListener("mousedown", () => activeHandle = "start");
   endHandle.addEventListener("mousedown", () => activeHandle = "end");
 
@@ -83,9 +77,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.addEventListener("mouseup", () => activeHandle = null);
 
-  // ======================
-  // Upload local file
-  // ======================
   uploadInput.addEventListener("change", e => {
     const file = e.target.files[0];
     if (!file) return;
@@ -97,6 +88,9 @@ document.addEventListener("DOMContentLoaded", () => {
     previewURL = URL.createObjectURL(file);
 
     preview.src = previewURL;
+    preview.style.display = "block";
+    preview.controls = true;
+
     trimmedVideo.style.display = "none";
     downloadBtn.disabled = true;
 
@@ -110,9 +104,7 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   });
 
-  // ======================
-  // Load from URL
-  // ======================
+  // ------------ URL LOAD FIXED PART ------------
   loadUrlBtn.addEventListener("click", async () => {
     const url = videoUrlInput.value.trim();
     if (!url) return alert("Paste a video URL");
@@ -120,7 +112,6 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       loading.style.display = "block";
 
-      // reset the upload state but DO NOT touch the upload logic
       selectedFile = null;
       uploadedFilename = null;
 
@@ -135,8 +126,13 @@ document.addEventListener("DOMContentLoaded", () => {
       const data = await res.json();
       uploadedFilename = data.filename;
 
-      // load the video in preview just like an upload
-      preview.src = `${API}${data.url}`;
+      // Normalize returned path
+      const fileUrl = data.url.startsWith("/") ? `${API}${data.url}` : `${API}/${data.url}`;
+
+      // Force preview video to show
+      preview.src = fileUrl;
+      preview.style.display = "block";
+      preview.controls = true;
       preview.load();
 
       trimmedVideo.style.display = "none";
@@ -157,9 +153,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // ======================
-  // Trim
-  // ======================
   trimBtn.addEventListener("click", async () => {
     const start = Number(startRange.value);
     const end = Number(endRange.value);
@@ -196,7 +189,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const trimData = await trimRes.json();
 
-      trimmedVideo.src = `${API}${trimData.url}`;
+      const outUrl = trimData.url.startsWith("/") ? `${API}${trimData.url}` : `${API}/${trimData.url}`;
+
+      trimmedVideo.src = outUrl;
       trimmedVideo.style.display = "block";
       trimmedVideo.controls = true;
 
@@ -211,9 +206,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // ======================
-  // Download
-  // ======================
   downloadBtn.addEventListener("click", () => {
     const a = document.createElement("a");
     a.href = trimmedVideo.src;
@@ -223,9 +215,6 @@ document.addEventListener("DOMContentLoaded", () => {
     document.body.removeChild(a);
   });
 
-  // ======================
-  // Reset
-  // ======================
   resetBtn.addEventListener("click", () => {
     selectedFile = null;
     uploadedFilename = null;
