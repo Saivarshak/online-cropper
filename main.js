@@ -28,6 +28,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
   downloadBtn.disabled = true;
 
+  function showSpinner() {
+    loading.style.display = "flex";
+  }
+
+  function hideSpinner() {
+    loading.style.display = "none";
+  }
+
   function formatTime(t) {
     const m = Math.floor(t / 60);
     const s = Math.floor(t % 60);
@@ -87,6 +95,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if (previewURL) URL.revokeObjectURL(previewURL);
     previewURL = URL.createObjectURL(file);
 
+    showSpinner();
+
     preview.src = previewURL;
     preview.style.display = "block";
     preview.controls = true;
@@ -101,16 +111,17 @@ document.addEventListener("DOMContentLoaded", () => {
       endRange.value = preview.duration;
       updateBubbles();
       updateHandles();
+      hideSpinner();
     };
   });
 
-  // ------------ URL LOAD FIXED PART ------------
+  // ------------ URL LOAD ------------
   loadUrlBtn.addEventListener("click", async () => {
     const url = videoUrlInput.value.trim();
     if (!url) return alert("Paste a video URL");
 
     try {
-      loading.style.display = "block";
+      showSpinner();
 
       selectedFile = null;
       uploadedFilename = null;
@@ -126,10 +137,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const data = await res.json();
       uploadedFilename = data.filename;
 
-      // Normalize returned path
       const fileUrl = data.url.startsWith("/") ? `${API}${data.url}` : `${API}/${data.url}`;
 
-      // Force preview video to show
       preview.src = fileUrl;
       preview.style.display = "block";
       preview.controls = true;
@@ -145,11 +154,11 @@ document.addEventListener("DOMContentLoaded", () => {
         endRange.value = preview.duration;
         updateBubbles();
         updateHandles();
+        hideSpinner();
       };
     } catch (err) {
       alert(err.message);
-    } finally {
-      loading.style.display = "none";
+      hideSpinner();
     }
   });
 
@@ -160,10 +169,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if (start >= end) return alert("Invalid trim range");
 
     try {
-      loading.style.display = "block";
+      showSpinner();
       trimBtn.disabled = true;
       downloadBtn.disabled = true;
 
+      // Upload file first if needed
       if (selectedFile && !uploadedFilename) {
         const fd = new FormData();
         fd.append("video", selectedFile);
@@ -197,11 +207,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
       trimmedVideo.onloadeddata = () => {
         downloadBtn.disabled = false;
+
+        // auto download to device
+        const a = document.createElement("a");
+        a.href = outUrl;
+        a.download = "trimmed-video.mp4";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        hideSpinner();
       };
     } catch (err) {
       alert(err.message);
+      hideSpinner();
     } finally {
-      loading.style.display = "none";
       trimBtn.disabled = false;
     }
   });
@@ -233,6 +253,4 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
-console.log("Server Started...");
-console.log("Server Started...");
 console.log("Server Started...");
