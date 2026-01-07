@@ -84,13 +84,18 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   document.addEventListener("mouseup", () => activeHandle = null);
-
+  // ------------ FILE UPLOAD ------------
   uploadInput.addEventListener("change", e => {
     const file = e.target.files[0];
     if (!file) return;
 
     selectedFile = file;
     uploadedFilename = null;
+    
+    //--remove previous preview upload ---
+    const videoElement = document.getElementById('trimmedvideo');
+    videoElement.src = '';
+
 
     if (previewURL) URL.revokeObjectURL(previewURL);
     previewURL = URL.createObjectURL(file);
