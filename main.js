@@ -84,6 +84,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   document.addEventListener("mouseup", () => activeHandle = null);
+
   // ------------ FILE UPLOAD ------------
   uploadInput.addEventListener("change", e => {
     const file = e.target.files[0];
@@ -91,11 +92,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     selectedFile = file;
     uploadedFilename = null;
-    
-    //--remove previous preview upload ---
-    const videoElement = document.getElementById('trimmedvideo');
-    videoElement.src = '';
 
+    const videoElement = document.getElementById("trimmedvideo");
+    videoElement.src = "";
 
     if (previewURL) URL.revokeObjectURL(previewURL);
     previewURL = URL.createObjectURL(file);
@@ -142,7 +141,9 @@ document.addEventListener("DOMContentLoaded", () => {
       const data = await res.json();
       uploadedFilename = data.filename;
 
-      const fileUrl = data.url.startsWith("/") ? `${API}${data.url}` : `${API}/${data.url}`;
+      const fileUrl = data.url.startsWith("/")
+        ? `${API}${data.url}`
+        : `${API}/${data.url}`;
 
       preview.src = fileUrl;
       preview.style.display = "block";
@@ -167,6 +168,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  // ------------ TRIM ------------
   trimBtn.addEventListener("click", async () => {
     const start = Number(startRange.value);
     const end = Number(endRange.value);
@@ -178,7 +180,6 @@ document.addEventListener("DOMContentLoaded", () => {
       trimBtn.disabled = true;
       downloadBtn.disabled = true;
 
-      // Upload file first if needed
       if (selectedFile && !uploadedFilename) {
         const fd = new FormData();
         fd.append("video", selectedFile);
@@ -204,22 +205,32 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const trimData = await trimRes.json();
 
-      const outUrl = trimData.url.startsWith("/") ? `${API}${trimData.url}` : `${API}/${trimData.url}`;
+      const outUrl = trimData.url.startsWith("/")
+        ? `${API}${trimData.url}`
+        : `${API}/${trimData.url}`;
 
       trimmedVideo.src = outUrl;
       trimmedVideo.style.display = "block";
       trimmedVideo.controls = true;
 
-      trimmedVideo.onloadeddata = () => {
+      trimmedVideo.onloadeddata = async () => {
         downloadBtn.disabled = false;
 
-        // auto download to device
-        const a = document.createElement("a");
-        a.href = outUrl;
-        a.download = "trimmed-video.mp4";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        // auto download
+        try {
+          const res = await fetch(outUrl);
+          const blob = await res.blob();
+          const blobUrl = URL.createObjectURL(blob);
+
+          const a = document.createElement("a");
+          a.href = blobUrl;
+          a.download = "trimmed-video.mp4";
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+
+          URL.revokeObjectURL(blobUrl);
+        } catch {}
 
         hideSpinner();
       };
@@ -231,15 +242,29 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  downloadBtn.addEventListener("click", () => {
-    const a = document.createElement("a");
-    a.href = trimmedVideo.src;
-    a.download = "trimmed-video.mp4";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+  // ------------ DIRECT DOWNLOAD BUTTON ------------
+  downloadBtn.addEventListener("click", async () => {
+    try {
+      if (!trimmedVideo.src) return;
+
+      const res = await fetch(trimmedVideo.src);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = "trimmed-video.mp4";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      alert("Download failed");
+    }
   });
 
+  // ------------ RESET ------------
   resetBtn.addEventListener("click", () => {
     selectedFile = null;
     uploadedFilename = null;
