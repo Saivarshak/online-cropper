@@ -1,10 +1,5 @@
-
-
-            /// URL based video trimmer////
-
 document.addEventListener("DOMContentLoaded", () => {
   const API = "https://video-trimmer-backend.onrender.com";
-  // const API = "http://localhost:3000";
 
   const preview = document.getElementById("preview");
   const trimmedVideo = document.getElementById("trimmedvideo");
@@ -57,7 +52,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.addEventListener("mousemove", e => {
     if (!activeHandle) return;
-
     const rect = timelineWrap.getBoundingClientRect();
     let percent = ((e.clientX - rect.left) / rect.width) * 100;
     percent = Math.max(0, Math.min(100, percent));
@@ -72,7 +66,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.addEventListener("mouseup", () => activeHandle = null);
 
-  // ------------ URL LOAD ONLY ------------
+  // ------------ LOAD URL ------------
   loadUrlBtn.addEventListener("click", async () => {
     const url = videoUrlInput.value.trim();
     if (!url) return alert("Paste a video URL");
@@ -86,19 +80,18 @@ document.addEventListener("DOMContentLoaded", () => {
         body: JSON.stringify({ url })
       });
 
-      if (!res.ok) throw new Error("Failed to load video");
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Failed to load video");
+      }
 
       const data = await res.json();
       uploadedFilename = data.filename;
-
-      const fileUrl = data.url.startsWith("/")
-        ? `${API}${data.url}`
-        : `${API}/${data.url}`;
+      const fileUrl = `${API.replace(/\/$/, "")}${data.url}`;
 
       preview.src = fileUrl;
       preview.style.display = "block";
       preview.controls = true;
-
       trimmedVideo.style.display = "none";
       downloadBtn.disabled = true;
 
@@ -130,18 +123,19 @@ document.addEventListener("DOMContentLoaded", () => {
       trimBtn.disabled = true;
       downloadBtn.disabled = true;
 
-      const trimRes = await fetch(`${API}/trim`, {
+      const res = await fetch(`${API}/trim`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ filename: uploadedFilename, start, end })
       });
 
-      if (!trimRes.ok) throw new Error("Trim failed");
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Trim failed");
+      }
 
-      const trimData = await trimRes.json();
-      const outUrl = trimData.url.startsWith("/")
-        ? `${API}${trimData.url}`
-        : `${API}/${trimData.url}`;
+      const data = await res.json();
+      const outUrl = `${API.replace(/\/$/, "")}${data.url}`;
 
       trimmedVideo.src = outUrl;
       trimmedVideo.style.display = "block";
@@ -193,4 +187,4 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
-console.log("Server Started...");
+console.log("Server Started....");
