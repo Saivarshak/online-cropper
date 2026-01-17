@@ -290,7 +290,8 @@
             /// URL based video trimmer////
 
 document.addEventListener("DOMContentLoaded", () => {
-  const API = "https://video-trimmer-backend.onrender.com";
+  // const API = "https://video-trimmer-backend.onrender.com";
+  const API = "http://localhost:3000";
 
   const preview = document.getElementById("preview");
   const trimmedVideo = document.getElementById("trimmedvideo");
