@@ -1,11 +1,8 @@
 document.addEventListener("DOMContentLoaded", () => {
-  // Ensure trailing slash and correct HTTPS
-  const API = "https://video-trimmer-backend.onrender.com/"; 
-
+  const API = "https://video-trimmer-backend.onrender.com";
 
   const preview = document.getElementById("preview");
   const trimmedVideo = document.getElementById("trimmedvideo");
-  const uploadInput = document.getElementById("UploadInput");
   const videoUrlInput = document.getElementById("videoUrlInput");
 
   const startRange = document.getElementById("startRange");
@@ -18,15 +15,18 @@ document.addEventListener("DOMContentLoaded", () => {
   const loadUrlBtn = document.getElementById("loadUrlBtn");
   const downloadBtn = document.getElementById("downloadBtn");
 
-  const thumbStrip = document.getElementById("thumbStrip");
   const loading = document.getElementById("loading");
+  const timelineWrap = document.getElementById("timelineWrap");
+  const startHandle = document.querySelector(".start-handle");
+  const endHandle = document.querySelector(".end-handle");
 
-  let selectedFile = null;
   let uploadedFilename = null;
-  let previewURL = null;
-  let thumbVideo = null;
+  let activeHandle = null;
 
   downloadBtn.disabled = true;
+
+  function showSpinner() { loading.style.display = "flex"; }
+  function hideSpinner() { loading.style.display = "none"; }
 
   function formatTime(t) {
     const m = Math.floor(t / 60);
@@ -39,93 +39,61 @@ document.addEventListener("DOMContentLoaded", () => {
     endBubble.textContent = formatTime(endRange.value);
   }
 
-  startRange.addEventListener("input", updateBubbles);
-  endRange.addEventListener("input", updateBubbles);
+  function valueToPercent(v) { return (v / startRange.max) * 100; }
+  function percentToValue(p) { return (p / 100) * startRange.max; }
 
-  function scrollToPreview() {
-    preview.scrollIntoView({ behavior: "smooth", block: "center" });
+  function updateHandles() {
+    startHandle.style.left = `${valueToPercent(startRange.value)}%`;
+    endHandle.style.left = `${valueToPercent(endRange.value)}%`;
   }
 
-  function generateThumbs(videoEl) {
-    thumbStrip.innerHTML = "";
-    if (thumbVideo) thumbVideo.remove();
+  startHandle.addEventListener("mousedown", () => activeHandle = "start");
+  endHandle.addEventListener("mousedown", () => activeHandle = "end");
 
-    thumbVideo = document.createElement("video");
-    thumbVideo.src = videoEl.src;
-    thumbVideo.muted = true;
+  document.addEventListener("mousemove", e => {
+    if (!activeHandle) return;
+    const rect = timelineWrap.getBoundingClientRect();
+    let percent = ((e.clientX - rect.left) / rect.width) * 100;
+    percent = Math.max(0, Math.min(100, percent));
+    const value = percentToValue(percent);
 
-    thumbVideo.onloadedmetadata = () => {
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-      const count = 6;
-      const interval = thumbVideo.duration / count;
-      let i = 0;
+    if (activeHandle === "start" && value < endRange.value) startRange.value = value;
+    if (activeHandle === "end" && value > startRange.value) endRange.value = value;
 
-      thumbVideo.onseeked = () => {
-        canvas.width = 120;
-        canvas.height = 70;
-        ctx.drawImage(thumbVideo, 0, 0, canvas.width, canvas.height);
-
-        const img = document.createElement("img");
-        img.src = canvas.toDataURL("image/jpeg", 0.6);
-        img.className = "thumb";
-        thumbStrip.appendChild(img);
-
-        i++;
-        if (i <= count) thumbVideo.currentTime = i * interval;
-      };
-
-      thumbVideo.currentTime = 0;
-    };
-  }
-
-  uploadInput.addEventListener("change", e => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    selectedFile = file;
-    uploadedFilename = null;
-
-    if (previewURL) URL.revokeObjectURL(previewURL);
-    previewURL = URL.createObjectURL(file);
-
-    preview.src = previewURL;
-    trimmedVideo.style.display = "none";
-    downloadBtn.disabled = true;
-
-    preview.onloadedmetadata = () => {
-      startRange.max = preview.duration;
-      endRange.max = preview.duration;
-      startRange.value = 0;
-      endRange.value = preview.duration;
-      updateBubbles();
-      generateThumbs(preview);
-      scrollToPreview();
-    };
+    updateBubbles();
+    updateHandles();
   });
 
+  document.addEventListener("mouseup", () => activeHandle = null);
+
+  // ------------ LOAD URL ------------
   loadUrlBtn.addEventListener("click", async () => {
     const url = videoUrlInput.value.trim();
     if (!url) return alert("Paste a video URL");
 
     try {
-      loading.style.display = "block";
+      showSpinner();
 
-      const res = await fetch(`${API}download-url`, {
+      const res = await fetch(`${API}/download-url`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
-        // Important for cross-origin request
-        credentials: "include",
+        body: JSON.stringify({ url })
       });
 
-      if (!res.ok) throw new Error("URL load failed");
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Failed to load video");
+      }
 
       const data = await res.json();
       uploadedFilename = data.filename;
+      const fileUrl = `${API.replace(/\/$/, "")}${data.url}`;
 
-      preview.src = API + data.url;
-      preview.load();
+      preview.src = fileUrl;
+      preview.style.display = "block";
+      preview.controls = true;
+      trimmedVideo.style.display = "none";
+      downloadBtn.disabled = true;
 
       preview.onloadedmetadata = () => {
         startRange.max = preview.duration;
@@ -133,93 +101,90 @@ document.addEventListener("DOMContentLoaded", () => {
         startRange.value = 0;
         endRange.value = preview.duration;
         updateBubbles();
-        generateThumbs(preview);
-        scrollToPreview();
+        updateHandles();
+        hideSpinner();
       };
     } catch (err) {
       alert(err.message);
-    } finally {
-      loading.style.display = "none";
+      hideSpinner();
     }
   });
 
+  // ------------ TRIM ------------
   trimBtn.addEventListener("click", async () => {
     const start = Number(startRange.value);
     const end = Number(endRange.value);
 
+    if (!uploadedFilename) return alert("Load a video URL first");
     if (start >= end) return alert("Invalid trim range");
 
     try {
-      loading.style.display = "block";
+      showSpinner();
       trimBtn.disabled = true;
       downloadBtn.disabled = true;
 
-      if (selectedFile && !uploadedFilename) {
-        const fd = new FormData();
-        fd.append("video", selectedFile);
-
-        const uploadRes = await fetch(`${API}upload`, {
-          method: "POST",
-          body: fd,
-          credentials: "include",
-        });
-
-        if (!uploadRes.ok) throw new Error("Upload failed");
-
-        const uploadData = await uploadRes.json();
-        uploadedFilename = uploadData.filename;
-      }
-
-      const trimRes = await fetch(`${API}trim`, {
+      const res = await fetch(`${API}/trim`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename: uploadedFilename, start, end }),
-        credentials: "include",
+        body: JSON.stringify({ filename: uploadedFilename, start, end })
       });
 
-      if (!trimRes.ok) throw new Error("Trim failed");
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Trim failed");
+      }
 
-      const trimData = await trimRes.json();
+      const data = await res.json();
+      const outUrl = `${API.replace(/\/$/, "")}${data.url}`;
 
-      trimmedVideo.src = API + trimData.url;
+      trimmedVideo.src = outUrl;
       trimmedVideo.style.display = "block";
       trimmedVideo.controls = true;
 
       trimmedVideo.onloadeddata = () => {
-        trimmedVideo.scrollIntoView({ behavior: "smooth", block: "center" });
         downloadBtn.disabled = false;
+        hideSpinner();
       };
     } catch (err) {
       alert(err.message);
+      hideSpinner();
     } finally {
-      loading.style.display = "none";
       trimBtn.disabled = false;
     }
   });
 
-  downloadBtn.addEventListener("click", () => {
-    if (!trimmedVideo.src) return;
+  // ------------ DOWNLOAD ------------
+  downloadBtn.addEventListener("click", async () => {
+    try {
+      const res = await fetch(trimmedVideo.src);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
 
-    const a = document.createElement("a");
-    a.href = trimmedVideo.src;
-    a.download = "trimmed-video.mp4";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = "trimmed-video.mp4";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      alert("Download failed");
+    }
   });
 
+  // ------------ RESET ------------
   resetBtn.addEventListener("click", () => {
-    selectedFile = null;
     uploadedFilename = null;
-
     preview.src = "";
     trimmedVideo.src = "";
     trimmedVideo.style.display = "none";
     downloadBtn.disabled = true;
-
-    thumbStrip.innerHTML = "";
     startRange.value = 0;
     endRange.value = 0;
     updateBubbles();
+    updateHandles();
   });
 });
+
+console.log("Server Started....");
